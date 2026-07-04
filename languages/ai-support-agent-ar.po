@@ -1,0 +1,405 @@
+# Arabic translation for AI Support Agent
+# Copyright (C) 2025 iBird
+# This file is distributed under the same license as the AI Support Agent plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: AI Support Agent 1.0.0\n"
+"Report-Msgid-Bugs-To: https://ibird.bh\n"
+"POT-Creation-Date: 2025-01-01T00:00:00+03:00\n"
+"PO-Revision-Date: 2025-01-01T00:00:00+03:00\n"
+"Last-Translator: iBird <support@ibird.bh>\n"
+"Language-Team: Arabic <ar@li.org>\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+"X-Generator: WP i18n\n"
+"X-Domain: ai-support-agent\n"
+
+msgid "AI Support Agent requires WooCommerce to be installed and active."
+msgstr "يتطلب وكيل الدعم الذكي تثبيت WooCommerce وتفعيله."
+
+msgid "Plugin Activation Error"
+msgstr "خطأ في تفعيل الإضافة"
+
+msgid "AI Support Agent requires WooCommerce. Please install and activate WooCommerce."
+msgstr "يتطلب وكيل الدعم الذكي WooCommerce. يرجى تثبيت WooCommerce وتفعيله."
+
+msgid "AI Support Agent"
+msgstr "وكيل الدعم الذكي"
+
+msgid "AI Agent"
+msgstr "وكيل الذكاء"
+
+msgid "Conversations"
+msgstr "المحادثات"
+
+msgid "Tickets"
+msgstr "التذاكر"
+
+msgid "Teach AI"
+msgstr "تدريب الذكاء"
+
+msgid "Manuals"
+msgstr "الأدلة"
+
+msgid "Categories"
+msgstr "الفئات"
+
+msgid "Serial Registry"
+msgstr "سجل الأرقام التسلسلية"
+
+msgid "Serials"
+msgstr "الأرقام التسلسلية"
+
+msgid "Analytics"
+msgstr "التحليلات"
+
+msgid "Settings"
+msgstr "الإعدادات"
+
+msgid "Access denied."
+msgstr "الوصول مرفوض."
+
+msgid "AI Support Agent — Settings"
+msgstr "وكيل الدعم الذكي — الإعدادات"
+
+msgid "Settings saved."
+msgstr "تم حفظ الإعدادات."
+
+msgid "Gemini API"
+msgstr "واجهة برمجة Gemini"
+
+msgid "API Key"
+msgstr "مفتاح API"
+
+msgid "Server-side only. Never sent to the browser."
+msgstr "على الخادم فقط. لا يُرسل إلى المتصفح أبداً."
+
+msgid "Reply Model ID"
+msgstr "معرّف نموذج الرد"
+
+msgid "Classify Model ID"
+msgstr "معرّف نموذج التصنيف"
+
+msgid "Embedding Model ID"
+msgstr "معرّف نموذج التضمين"
+
+msgid "Fallback Provider — Groq"
+msgstr "مزوّد الاحتياط — Groq"
+
+msgid "Used automatically when Gemini is unavailable or rate-limited. Get a free key at console.groq.com."
+msgstr "يُستخدم تلقائياً عند عدم توفر Gemini أو تجاوز الحد. احصل على مفتاح مجاني من console.groq.com."
+
+msgid "Groq API Key"
+msgstr "مفتاح Groq API"
+
+msgid "Optional. Leave blank to skip this provider."
+msgstr "اختياري. اتركه فارغاً لتخطي هذا المزوّد."
+
+msgid "Groq Model ID"
+msgstr "معرّف نموذج Groq"
+
+msgid "Fallback Provider — Cerebras"
+msgstr "مزوّد الاحتياط — Cerebras"
+
+msgid "Third-line fallback. Fastest inference, free tier at cloud.cerebras.ai."
+msgstr "الاحتياط من المستوى الثالث. أسرع استنتاج، طبقة مجانية على cloud.cerebras.ai."
+
+msgid "Cerebras API Key"
+msgstr "مفتاح Cerebras API"
+
+msgid "Cerebras Model ID"
+msgstr "معرّف نموذج Cerebras"
+
+msgid "Quota & Throttle"
+msgstr "الحصة والتحكم بالسرعة"
+
+msgid "Global Daily Cap"
+msgstr "الحد اليومي العام"
+
+msgid "Stop LLM calls when this many requests have been made today (circuit breaker). Gemini free = 1,500/day."
+msgstr "أوقف طلبات LLM عند الوصول لهذا العدد اليوم (قاطع الدائرة). Gemini المجاني = 1,500 يومياً."
+
+msgid "Per-Session Cap"
+msgstr "حد الجلسة الواحدة"
+
+msgid "Max messages per chat session before escalating."
+msgstr "الحد الأقصى للرسائل في كل جلسة قبل التصعيد."
+
+msgid "Per-Customer Daily Cap"
+msgstr "الحد اليومي لكل عميل"
+
+msgid "Max daily messages per user/IP."
+msgstr "الحد الأقصى للرسائل اليومية لكل مستخدم أو IP."
+
+msgid "Widget"
+msgstr "الأداة"
+
+msgid "Widget Title (EN)"
+msgstr "عنوان الأداة (EN)"
+
+msgid "Widget Title (AR)"
+msgstr "عنوان الأداة (AR)"
+
+msgid "Widget Position"
+msgstr "موضع الأداة"
+
+msgid "Bottom Right"
+msgstr "أسفل اليمين"
+
+msgid "Bottom Left"
+msgstr "أسفل اليسار"
+
+msgid "Fallback Messages"
+msgstr "رسائل الاحتياط"
+
+msgid "Shown when the AI cannot respond (rate limit, API error)."
+msgstr "تظهر عندما لا يستطيع الذكاء الاصطناعي الرد (تجاوز الحد، خطأ في API)."
+
+msgid "Fallback (EN)"
+msgstr "الاحتياط (EN)"
+
+msgid "Fallback (AR)"
+msgstr "الاحتياط (AR)"
+
+msgid "Save Settings"
+msgstr "حفظ الإعدادات"
+
+msgid "Widget Shortcode"
+msgstr "رمز الأداة المختصر"
+
+msgid "Paste this into any page to show the chat widget:"
+msgstr "الصق هذا في أي صفحة لعرض أداة الدردشة:"
+
+msgid "Usage Today"
+msgstr "الاستخدام اليوم"
+
+msgid "ID"
+msgstr "المعرّف"
+
+msgid "Session"
+msgstr "الجلسة"
+
+msgid "Mode"
+msgstr "الوضع"
+
+msgid "Status"
+msgstr "الحالة"
+
+msgid "Updated"
+msgstr "آخر تحديث"
+
+msgid "No conversations yet."
+msgstr "لا توجد محادثات بعد."
+
+msgid "Good"
+msgstr "جيد"
+
+msgid "Wrong"
+msgstr "خاطئ"
+
+msgid "Incomplete"
+msgstr "غير مكتمل"
+
+msgid "Write the correct answer (optional)…"
+msgstr "اكتب الإجابة الصحيحة (اختياري)…"
+
+msgid "Add correction to knowledge base"
+msgstr "إضافة التصحيح إلى قاعدة المعرفة"
+
+msgid "Save Rating"
+msgstr "حفظ التقييم"
+
+msgid "Correction:"
+msgstr "التصحيح:"
+
+msgid "Support Tickets"
+msgstr "تذاكر الدعم"
+
+msgid "Resolve Ticket"
+msgstr "حل التذكرة"
+
+msgid "Resolution / Notes"
+msgstr "الحل / الملاحظات"
+
+msgid "Promote to KB"
+msgstr "إضافة لقاعدة المعرفة"
+
+msgid "Add this resolution as a taught example (closes the self-improvement loop)"
+msgstr "أضف هذا الحل كمثال مُعلَّم (يُغلق حلقة التحسين الذاتي)"
+
+msgid "Mark Resolved"
+msgstr "تعيين كمحلول"
+
+msgid "Teach the AI"
+msgstr "تدريب الذكاء الاصطناعي"
+
+msgid "Question / Problem"
+msgstr "السؤال / المشكلة"
+
+msgid "Answer / Solution"
+msgstr "الإجابة / الحل"
+
+msgid "Language"
+msgstr "اللغة"
+
+msgid "Both (default)"
+msgstr "كلاهما (افتراضي)"
+
+msgid "English only"
+msgstr "الإنجليزية فقط"
+
+msgid "Arabic only"
+msgstr "العربية فقط"
+
+msgid "Save & Teach"
+msgstr "حفظ وتدريب"
+
+msgid "Knowledge Base"
+msgstr "قاعدة المعرفة"
+
+msgid "Product Manuals"
+msgstr "أدلة المنتجات"
+
+msgid "Product Model"
+msgstr "موديل المنتج"
+
+msgid "Must exactly match the model stored in the serial registry."
+msgstr "يجب أن يطابق تماماً الموديل المسجّل في سجل الأرقام التسلسلية."
+
+msgid "Upload PDF"
+msgstr "رفع ملف PDF"
+
+msgid "Paste text"
+msgstr "لصق النص"
+
+msgid "Ingest Manual"
+msgstr "استيعاب الدليل"
+
+msgid "Knowledge Categories"
+msgstr "فئات المعرفة"
+
+msgid "Add Category"
+msgstr "إضافة فئة"
+
+msgid "Name (EN)"
+msgstr "الاسم (EN)"
+
+msgid "Name (AR)"
+msgstr "الاسم (AR)"
+
+msgid "Add (pre-approved)"
+msgstr "إضافة (موافق عليها مسبقاً)"
+
+msgid "Approved"
+msgstr "موافق عليها"
+
+msgid "Pending"
+msgstr "معلّقة"
+
+msgid "Approve"
+msgstr "موافقة"
+
+msgid "Serial Registry"
+msgstr "سجل الأرقام التسلسلية"
+
+msgid "CSV Import"
+msgstr "استيراد CSV"
+
+msgid "Import CSV"
+msgstr "استيراد ملف CSV"
+
+msgid "Registered Serials"
+msgstr "الأرقام التسلسلية المسجّلة"
+
+msgid "Serial"
+msgstr "الرقم التسلسلي"
+
+msgid "Purchased"
+msgstr "تاريخ الشراء"
+
+msgid "Warranty Until"
+msgstr "الضمان حتى"
+
+msgid "Analytics"
+msgstr "التحليلات"
+
+msgid "Data reflects all time unless otherwise noted."
+msgstr "البيانات تعكس جميع الأوقات ما لم يُشر إلى خلاف ذلك."
+
+msgid "Total Conversations"
+msgstr "إجمالي المحادثات"
+
+msgid "New Today"
+msgstr "جديدة اليوم"
+
+msgid "Total Messages"
+msgstr "إجمالي الرسائل"
+
+msgid "Deflection Rate"
+msgstr "معدل الانحراف"
+
+msgid "Escalations"
+msgstr "التصعيدات"
+
+msgid "Open Tickets"
+msgstr "التذاكر المفتوحة"
+
+msgid "Taught Examples"
+msgstr "الأمثلة المُعلَّمة"
+
+msgid "Manual Chunks"
+msgstr "أجزاء الأدلة"
+
+msgid "LLM Requests — Last 7 Days"
+msgstr "طلبات LLM — آخر 7 أيام"
+
+msgid "Rating Breakdown"
+msgstr "توزيع التقييمات"
+
+msgid "No ratings yet."
+msgstr "لا توجد تقييمات بعد."
+
+msgid "Conversation Mode"
+msgstr "وضع المحادثة"
+
+msgid "Product Q&A"
+msgstr "أسئلة المنتج"
+
+msgid "Support"
+msgstr "الدعم"
+
+msgid "No conversations yet."
+msgstr "لا توجد محادثات بعد."
+
+msgid "Top Knowledge Categories"
+msgstr "أعلى فئات المعرفة"
+
+msgid "No categories yet — teach some examples first."
+msgstr "لا توجد فئات بعد — قم بتدريب بعض الأمثلة أولاً."
+
+msgid "Self-Improvement Funnel"
+msgstr "مسار التحسين الذاتي"
+
+msgid "AI Replies Rated"
+msgstr "ردود الذكاء المُقيَّمة"
+
+msgid "Corrections Written"
+msgstr "التصحيحات المكتوبة"
+
+msgid "Tickets Resolved"
+msgstr "التذاكر المحلولة"
+
+msgid "Total Taught Examples"
+msgstr "إجمالي الأمثلة المُعلَّمة"
+
+msgid "Each taught example improves future answers without retraining the model."
+msgstr "كل مثال مُعلَّم يحسّن الإجابات المستقبلية دون إعادة تدريب النموذج."
+
+msgid "Rating Trend (Last 30 Days)"
+msgstr "اتجاه التقييمات (آخر 30 يوم)"
+
+msgid "Day"
+msgstr "اليوم"

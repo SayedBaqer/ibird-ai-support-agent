@@ -1,0 +1,325 @@
+# Copyright (C) 2025 iBird
+# This file is distributed under the same license as the AI Support Agent plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: AI Support Agent 1.0.0\n"
+"Report-Msgid-Bugs-To: https://ibird.bh\n"
+"POT-Creation-Date: 2025-01-01T00:00:00+03:00\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2025-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: Arabic <ar@li.org>\n"
+"Language: ar\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+"X-Generator: WP i18n\n"
+"X-Domain: ai-support-agent\n"
+
+#: ai-support-agent.php
+msgid "AI Support Agent requires WooCommerce to be installed and active."
+msgstr ""
+
+#: ai-support-agent.php
+msgid "Plugin Activation Error"
+msgstr ""
+
+#: ai-support-agent.php
+msgid "AI Support Agent requires WooCommerce. Please install and activate WooCommerce."
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "AI Support Agent"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "AI Agent"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Conversations"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Tickets"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Teach AI"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Manuals"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Categories"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Serial Registry"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Serials"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Settings"
+msgstr ""
+
+#: admin/class-aiagent-admin.php
+msgid "Access denied."
+msgstr ""
+
+#: admin/views/settings.php
+msgid "AI Support Agent — Settings"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Settings saved."
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Gemini API"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "API Key"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Server-side only. Never sent to the browser."
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Reply Model ID"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Classify Model ID"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Embedding Model ID"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Quota & Throttle"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Global Daily Cap"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Per-Session Cap"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Per-Customer Daily Cap"
+msgstr ""
+
+#: admin/views/settings.php
+msgid "Save Settings"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Conversations"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "ID"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Session"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Mode"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Status"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Updated"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "No conversations yet."
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Good"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Wrong"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Incomplete"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Write the correct answer (optional)…"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Add correction to knowledge base"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Save Rating"
+msgstr ""
+
+#: admin/views/conversations.php
+msgid "Correction:"
+msgstr ""
+
+#: admin/views/tickets.php
+msgid "Support Tickets"
+msgstr ""
+
+#: admin/views/tickets.php
+msgid "Resolve Ticket"
+msgstr ""
+
+#: admin/views/tickets.php
+msgid "Resolution / Notes"
+msgstr ""
+
+#: admin/views/tickets.php
+msgid "Promote to KB"
+msgstr ""
+
+#: admin/views/tickets.php
+msgid "Add this resolution as a taught example (closes the self-improvement loop)"
+msgstr ""
+
+#: admin/views/tickets.php
+msgid "Mark Resolved"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Teach the AI"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Question / Problem"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Answer / Solution"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Language"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Both (default)"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "English only"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Arabic only"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Save & Teach"
+msgstr ""
+
+#: admin/views/teach.php
+msgid "Knowledge Base"
+msgstr ""
+
+#: admin/views/manuals.php
+msgid "Product Manuals"
+msgstr ""
+
+#: admin/views/manuals.php
+msgid "Product Model"
+msgstr ""
+
+#: admin/views/manuals.php
+msgid "Must exactly match the model stored in the serial registry."
+msgstr ""
+
+#: admin/views/manuals.php
+msgid "Upload PDF"
+msgstr ""
+
+#: admin/views/manuals.php
+msgid "Paste text"
+msgstr ""
+
+#: admin/views/manuals.php
+msgid "Ingest Manual"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Knowledge Categories"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Add Category"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Name (EN)"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Name (AR)"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Add (pre-approved)"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Approved"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Pending"
+msgstr ""
+
+#: admin/views/categories.php
+msgid "Approve"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "Serial Registry"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "CSV Import"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "Import CSV"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "Registered Serials"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "Serial"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "Purchased"
+msgstr ""
+
+#: admin/views/serials.php
+msgid "Warranty Until"
+msgstr ""

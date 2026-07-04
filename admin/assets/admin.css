@@ -1,0 +1,468 @@
+/* ── AI Support Agent — Admin CSS v1.0.5 ────────────────────────────────────
+   All rules scoped under .aiagent-page / .aiagent-settings to win WP specificity.
+   !important used only where WP admin styles are known to override layout.    */
+
+/* ── CSS variables ────────────────────────────────────────────────────────── */
+.aiagent-page,
+.aiagent-settings {
+  --aa-primary:       #1a6b3c;
+  --aa-primary-dark:  #145530;
+  --aa-primary-light: #e8f5ee;
+  --aa-white:         #ffffff;
+  --aa-bg:            #f6f7fb;
+  --aa-border:        #e2e8f0;
+  --aa-text:          #1e293b;
+  --aa-muted:         #64748b;
+  --aa-shadow:        0 1px 4px rgba(0,0,0,.08);
+  --aa-shadow-md:     0 4px 16px rgba(0,0,0,.10);
+  --aa-radius:        12px;
+  --aa-radius-sm:     8px;
+}
+
+/* ── Page title ───────────────────────────────────────────────────────────── */
+.aiagent-page h1,
+.aiagent-settings h1 {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: var(--aa-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 20px !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-card,
+.aiagent-settings .aa-card {
+  background: var(--aa-white) !important;
+  border: 1px solid var(--aa-border) !important;
+  border-radius: var(--aa-radius) !important;
+  box-shadow: var(--aa-shadow) !important;
+  padding: 24px !important;
+  margin-bottom: 20px !important;
+}
+.aiagent-page .aa-card__title,
+.aiagent-settings .aa-card__title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--aa-text) !important;
+  margin-bottom: 18px !important;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--aa-border) !important;
+  display: block !important;
+}
+
+/* ── Two-column flex layout ───────────────────────────────────────────────── */
+.aiagent-page .aa-layout-2col,
+.aiagent-settings .aa-layout-2col {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 20px !important;
+  align-items: flex-start !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  float: none !important;
+  clear: both !important;
+}
+.aiagent-page .aa-col-main,
+.aiagent-settings .aa-col-main {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: 100% !important;
+  float: none !important;
+}
+.aiagent-page .aa-col-side,
+.aiagent-settings .aa-col-side {
+  flex: 0 0 380px !important;
+  width: 380px !important;
+  max-width: 380px !important;
+  min-width: 280px !important;
+  float: none !important;
+}
+
+@media (max-width: 1100px) {
+  .aiagent-page .aa-layout-2col { flex-wrap: wrap !important; }
+  .aiagent-page .aa-col-side,
+  .aiagent-settings .aa-col-side { flex: 0 0 100% !important; width: 100% !important; max-width: 100% !important; }
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 13px !important;
+}
+.aiagent-page .aa-table th {
+  text-align: left !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .5px !important;
+  color: var(--aa-muted) !important;
+  padding: 10px 16px !important;
+  border-bottom: 2px solid var(--aa-border) !important;
+  background: var(--aa-bg) !important;
+  white-space: nowrap !important;
+}
+.aiagent-page .aa-table td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--aa-border) !important;
+  color: var(--aa-text) !important;
+  vertical-align: middle !important;
+  background: transparent !important;
+}
+.aiagent-page .aa-table tr:last-child td { border-bottom: none !important; }
+.aiagent-page .aa-table tr:hover td     { background: #f8fafc !important; }
+.aiagent-page .aa-row--active td        { background: var(--aa-primary-light) !important; }
+.aiagent-page .aa-table__link {
+  color: var(--aa-primary) !important;
+  text-decoration: none !important;
+  font-weight: 600 !important;
+}
+.aiagent-page .aa-table__link:hover { text-decoration: underline !important; }
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-badge,
+.aiagent-settings .aa-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 3px 10px !important;
+  border-radius: 50px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: .2px !important;
+  white-space: nowrap !important;
+  line-height: 1.5 !important;
+}
+.aa-badge--product   { background: #e3f2fd !important; color: #1565c0 !important; }
+.aa-badge--support   { background: #fce4ec !important; color: #c62828 !important; }
+.aa-badge--active    { background: #e8f5e9 !important; color: #2e7d32 !important; }
+.aa-badge--escalated { background: #fff3e0 !important; color: #e65100 !important; }
+.aa-badge--closed    { background: #f5f5f5 !important; color: #757575 !important; }
+.aa-badge--open      { background: #fff3e0 !important; color: #e65100 !important; }
+.aa-badge--claimed   { background: #e3f2fd !important; color: #1565c0 !important; }
+.aa-badge--resolved  { background: #e8f5e9 !important; color: #2e7d32 !important; }
+.aa-badge--pending   { background: #f3e5f5 !important; color: #6a1b9a !important; }
+.aa-badge--good      { background: #e8f5e9 !important; color: #2e7d32 !important; }
+.aa-badge--wrong     { background: #fce4ec !important; color: #c62828 !important; }
+.aa-badge--incomplete{ background: #fff3e0 !important; color: #e65100 !important; }
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-btn,
+.aiagent-settings .aa-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 9px 18px !important;
+  border-radius: var(--aa-radius-sm) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  border: none !important;
+  font-family: inherit !important;
+  transition: background .15s, box-shadow .15s !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  height: auto !important;
+}
+.aa-btn--primary { background: var(--aa-primary) !important; color: #fff !important; }
+.aa-btn--primary:hover { background: var(--aa-primary-dark) !important; color: #fff !important; box-shadow: 0 3px 10px rgba(26,107,60,.3) !important; }
+.aa-btn--outline { background: #fff !important; color: var(--aa-primary) !important; border: 1.5px solid var(--aa-primary) !important; }
+.aa-btn--outline:hover { background: var(--aa-primary-light) !important; }
+.aa-btn--danger  { background: #fff !important; color: #c62828 !important; border: 1.5px solid #e57373 !important; }
+.aa-btn--danger:hover  { background: #fce4ec !important; }
+.aa-btn--sm { padding: 5px 12px !important; font-size: 12px !important; }
+.aa-btn:disabled { opacity: .5 !important; cursor: not-allowed !important; }
+
+/* ── Form inputs — override WP admin form styles ──────────────────────────── */
+.aiagent-page .aa-field,
+.aiagent-settings .aa-field {
+  margin-bottom: 18px !important;
+  display: block !important;
+  float: none !important;
+}
+.aiagent-page .aa-field label,
+.aiagent-settings .aa-field label {
+  display: block !important;
+  float: none !important;
+  width: auto !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--aa-muted) !important;
+  text-transform: uppercase !important;
+  letter-spacing: .5px !important;
+  margin-bottom: 6px !important;
+  padding: 0 !important;
+  vertical-align: baseline !important;
+  text-align: left !important;
+}
+.aiagent-page .aa-input,
+.aiagent-page .aa-select,
+.aiagent-page .aa-textarea,
+.aiagent-settings .aa-input,
+.aiagent-settings .aa-select,
+.aiagent-settings .aa-textarea {
+  display: block !important;
+  width: 100% !important;
+  border: 1.5px solid var(--aa-border) !important;
+  border-radius: var(--aa-radius-sm) !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  color: var(--aa-text) !important;
+  background: var(--aa-white) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  transition: border-color .2s, box-shadow .2s !important;
+  line-height: 1.5 !important;
+  height: auto !important;
+  max-width: 100% !important;
+}
+.aiagent-page .aa-input:focus,
+.aiagent-page .aa-select:focus,
+.aiagent-page .aa-textarea:focus,
+.aiagent-settings .aa-input:focus,
+.aiagent-settings .aa-select:focus,
+.aiagent-settings .aa-textarea:focus {
+  border-color: var(--aa-primary) !important;
+  box-shadow: 0 0 0 3px rgba(26,107,60,.1) !important;
+}
+.aiagent-page .aa-textarea,
+.aiagent-settings .aa-textarea {
+  resize: vertical !important;
+  min-height: 90px !important;
+  line-height: 1.6 !important;
+}
+.aa-field__desc {
+  font-size: 12px !important;
+  color: var(--aa-muted) !important;
+  margin-top: 5px !important;
+  display: block !important;
+}
+
+/* ── Grid layout for settings ─────────────────────────────────────────────── */
+.aiagent-settings .aa-grid-2,
+.aiagent-page .aa-grid-2 {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 20px !important;
+}
+.aiagent-settings .aa-grid-3,
+.aiagent-page .aa-grid-3 {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  gap: 20px !important;
+}
+@media (max-width: 900px) {
+  .aiagent-settings .aa-grid-2,
+  .aiagent-settings .aa-grid-3,
+  .aiagent-page .aa-grid-2,
+  .aiagent-page .aa-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Section title (settings groups) ─────────────────────────────────────── */
+.aiagent-page .aa-section-title,
+.aiagent-settings .aa-section-title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--aa-text) !important;
+  background: var(--aa-bg) !important;
+  padding: 10px 16px !important;
+  border-radius: var(--aa-radius-sm) !important;
+  margin: 24px 0 16px !important;
+  border-left: 4px solid var(--aa-primary) !important;
+  display: block !important;
+}
+
+/* ── Notices ──────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-notice,
+.aiagent-settings .aa-notice {
+  padding: 12px 16px !important;
+  border-radius: var(--aa-radius-sm) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  margin-bottom: 16px !important;
+  display: block !important;
+}
+.aa-notice--success { background: var(--aa-primary-light) !important; color: var(--aa-primary-dark) !important; border-left: 4px solid var(--aa-primary) !important; }
+.aa-notice--error   { background: #fce4ec !important; color: #b71c1c !important; border-left: 4px solid #ef5350 !important; }
+.aa-notice--info    { background: #e3f2fd !important; color: #0d47a1 !important; border-left: 4px solid #1976d2 !important; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-tabs {
+  display: flex !important;
+  gap: 2px !important;
+  border-bottom: 2px solid var(--aa-border) !important;
+  margin-bottom: 20px !important;
+  padding: 0 !important;
+  background: none !important;
+}
+.aiagent-page .aa-tab {
+  padding: 9px 18px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--aa-muted) !important;
+  cursor: pointer !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  background: none !important;
+  margin-bottom: -2px !important;
+  font-family: inherit !important;
+  transition: color .15s, border-color .15s !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+.aiagent-page .aa-tab:hover     { color: var(--aa-primary) !important; }
+.aiagent-page .aa-tab--active   { color: var(--aa-primary) !important; border-bottom-color: var(--aa-primary) !important; }
+
+/* ── Panels (detail/resolve) ─────────────────────────────────────────────── */
+.aiagent-page .aa-panel {
+  background: var(--aa-white) !important;
+  border: 1px solid var(--aa-border) !important;
+  border-radius: var(--aa-radius) !important;
+  padding: 20px !important;
+  box-shadow: var(--aa-shadow) !important;
+}
+.aiagent-page .aa-panel__title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--aa-text) !important;
+  margin-bottom: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--aa-border) !important;
+}
+
+/* ── Chat log ─────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-chat-log {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+.aiagent-page .aa-msg {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  max-width: 100% !important;
+}
+.aiagent-page .aa-msg--ai       { align-items: flex-start !important; }
+.aiagent-page .aa-msg--customer { align-items: flex-end !important; }
+.aiagent-page .aa-msg--human    { align-items: flex-start !important; }
+.aiagent-page .aa-msg__bubble {
+  max-width: 80% !important;
+  padding: 10px 14px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  word-break: break-word !important;
+}
+.aiagent-page .aa-msg--ai .aa-msg__bubble       { background: var(--aa-bg) !important; color: var(--aa-text) !important; border-bottom-left-radius: 4px !important; border: 1px solid var(--aa-border) !important; }
+.aiagent-page .aa-msg--customer .aa-msg__bubble { background: var(--aa-primary) !important; color: #fff !important; border-bottom-right-radius: 4px !important; }
+.aiagent-page .aa-msg--human .aa-msg__bubble    { background: #fff8e6 !important; color: #7c5700 !important; border-left: 3px solid #f6c040 !important; border-bottom-left-radius: 4px !important; }
+.aiagent-page .aa-msg__meta {
+  font-size: 11px !important;
+  color: var(--aa-muted) !important;
+  display: flex !important;
+  gap: 8px !important;
+  padding: 0 4px !important;
+}
+.aiagent-page .aa-msg__attachment img { max-width: 180px !important; border-radius: 8px !important; display: block !important; margin-bottom: 6px !important; }
+
+/* ── Rating UI ────────────────────────────────────────────────────────────── */
+.aiagent-page .aa-rating       { margin-top: 8px !important; padding-left: 4px !important; }
+.aiagent-page .aa-rating__btns { display: flex !important; gap: 6px !important; flex-wrap: wrap !important; }
+.aiagent-page .aa-rate-btn {
+  background: var(--aa-white) !important;
+  border: 1.5px solid var(--aa-border) !important;
+  border-radius: 50px !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  transition: all .15s !important;
+  height: auto !important;
+  line-height: 1.5 !important;
+}
+.aiagent-page .aa-rate-btn--good       { border-color: #4caf50 !important; color: #2e7d32 !important; }
+.aiagent-page .aa-rate-btn--wrong      { border-color: #ef5350 !important; color: #c62828 !important; }
+.aiagent-page .aa-rate-btn--incomplete { border-color: #ffa726 !important; color: #e65100 !important; }
+.aiagent-page .aa-correction-form      { margin-top: 10px !important; display: flex !important; flex-direction: column !important; gap: 8px !important; }
+.aiagent-page .aa-promote-label { font-size: 12px !important; color: var(--aa-muted) !important; display: flex !important; align-items: center !important; gap: 6px !important; cursor: pointer !important; }
+.aiagent-page .aa-rating-done            { font-size: 12px !important; font-weight: 600 !important; margin-top: 6px !important; }
+.aiagent-page .aa-rating-done--good      { color: #2e7d32 !important; }
+.aiagent-page .aa-rating-done--wrong     { color: #c62828 !important; }
+.aiagent-page .aa-rating-done--incomplete{ color: #e65100 !important; }
+.aiagent-page .aa-rating-correction { font-size: 12px !important; margin-top: 6px !important; background: #fff9e6 !important; border-left: 3px solid #ffc107 !important; padding: 6px 10px !important; border-radius: 0 6px 6px 0 !important; }
+.aiagent-page .aa-rating-promoted   { font-size: 12px !important; color: var(--aa-primary) !important; margin-top: 4px !important; }
+
+/* ── Progress bar ─────────────────────────────────────────────────────────── */
+.aiagent-page .aa-progress,
+.aiagent-settings .aa-progress {
+  background: var(--aa-border) !important;
+  border-radius: 50px !important;
+  height: 10px !important;
+  overflow: hidden !important;
+  display: block !important;
+}
+.aa-progress__bar { height: 100% !important; border-radius: 50px !important; transition: width .4s !important; display: block !important; }
+.aa-progress__bar--green  { background: var(--aa-primary) !important; }
+.aa-progress__bar--orange { background: #ffa726 !important; }
+.aa-progress__bar--red    { background: #ef5350 !important; }
+
+/* ── Usage row ────────────────────────────────────────────────────────────── */
+.aiagent-settings .aa-usage { display: flex !important; flex-direction: column !important; gap: 6px !important; }
+.aiagent-settings .aa-usage__row { display: flex !important; justify-content: space-between !important; font-size: 12px !important; color: var(--aa-muted) !important; }
+.aiagent-settings .aa-usage__count { font-weight: 700 !important; color: var(--aa-text) !important; }
+
+/* ── Empty states ─────────────────────────────────────────────────────────── */
+.aiagent-page .aa-empty {
+  text-align: center !important;
+  padding: 36px 20px !important;
+  color: var(--aa-muted) !important;
+}
+.aiagent-page .aa-empty__icon  { font-size: 38px !important; margin-bottom: 10px !important; display: block !important; }
+.aiagent-page .aa-empty__title { font-size: 15px !important; font-weight: 700 !important; color: var(--aa-text) !important; margin-bottom: 6px !important; display: block !important; }
+.aiagent-page .aa-empty__desc  { font-size: 13px !important; display: block !important; }
+
+/* ── Analytics stat cards ─────────────────────────────────────────────────── */
+.aiagent-page .aa-stats {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+  gap: 14px !important;
+  margin-bottom: 24px !important;
+}
+.aiagent-page .aa-stat {
+  background: var(--aa-white) !important;
+  border: 1px solid var(--aa-border) !important;
+  border-radius: var(--aa-radius) !important;
+  padding: 18px 20px !important;
+  box-shadow: var(--aa-shadow) !important;
+  text-align: center !important;
+  transition: box-shadow .2s !important;
+}
+.aiagent-page .aa-stat:hover { box-shadow: var(--aa-shadow-md) !important; }
+.aiagent-page .aa-stat__val   { font-size: 26px !important; font-weight: 800 !important; line-height: 1 !important; margin-bottom: 6px !important; display: block !important; }
+.aiagent-page .aa-stat__label { font-size: 11px !important; color: var(--aa-muted) !important; font-weight: 500 !important; display: block !important; }
+.aa-stat--green  .aa-stat__val { color: var(--aa-primary) !important; }
+.aa-stat--blue   .aa-stat__val { color: #0277bd !important; }
+.aa-stat--orange .aa-stat__val { color: #e65100 !important; }
+.aa-stat--purple .aa-stat__val { color: #6a1b9a !important; }
+.aa-stat--red    .aa-stat__val { color: #c62828 !important; }
+.aa-stat--grey   .aa-stat__val { color: #455a64 !important; }
+
+/* ── Pagination ───────────────────────────────────────────────────────────── */
+.aiagent-page .aa-pagination { display: flex !important; align-items: center !important; gap: 8px !important; justify-content: flex-end !important; margin-top: 12px !important; font-size: 13px !important; color: var(--aa-muted) !important; }
+.aiagent-page .aa-pagination a { color: var(--aa-primary) !important; text-decoration: none !important; padding: 4px 8px !important; border-radius: 6px !important; }
+.aiagent-page .aa-pagination a:hover { background: var(--aa-primary-light) !important; }

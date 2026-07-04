@@ -1,0 +1,51 @@
+name: Build & Release
+
+# Trigger: push a version tag like  git tag v1.0.9 && git push origin v1.0.9
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create releases and upload assets
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin zip
+        run: |
+          mkdir -p dist
+          zip -r dist/ai-support-agent.zip . \
+            --exclude "*.git*" \
+            --exclude ".github/*" \
+            --exclude "dist/*" \
+            --exclude "*.zip" \
+            --exclude ".gitignore" \
+            --exclude "*.DS_Store" \
+            --exclude "Thumbs.db"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Version ${{ steps.version.outputs.version }}"
+          body: |
+            ## iBird AI Support Agent — ${{ github.ref_name }}
+
+            ### Install / Update
+            WordPress admin will show **"Update available"** automatically if the plugin is already installed.
+            Otherwise download `ai-support-agent.zip` below and install via **Plugins → Add New → Upload**.
+
+            ### What's changed
+            _See commit history for details._
+          draft: false
+          prerelease: false
+          files: dist/ai-support-agent.zip

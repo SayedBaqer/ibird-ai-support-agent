@@ -1,0 +1,19 @@
+# WordPress / PHP
+*.log
+wp-config.php
+
+# Build artifacts (zip is built by GitHub Actions, not committed)
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Uploaded media (not source)
+public/assets/uploads/
+admin/assets/uploads/

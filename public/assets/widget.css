@@ -1,0 +1,368 @@
+/* ── AI Support Agent — Widget CSS ─────────────────────────────────────────
+   Scoped under #aiagent-widget-root to beat any theme override.
+   All layout-critical rules have !important.                               */
+
+/* ── Reset inside widget only ─────────────────────────────────────────── */
+#aiagent-widget-root,
+#aiagent-widget-root * ,
+#aiagent-widget-root *::before,
+#aiagent-widget-root *::after {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  line-height: normal !important;
+}
+
+/* ── CSS vars ─────────────────────────────────────────────────────────── */
+#aiagent-widget-root {
+  --w-green:      #1a6b3c;
+  --w-green-dk:   #145530;
+  --w-green-lt:   #e8f5ee;
+  --w-accent:     #25d366;
+  --w-white:      #ffffff;
+  --w-bg:         #f0f2f5;
+  --w-border:     #e4e8ed;
+  --w-text:       #1a1a2e;
+  --w-muted:      #6b7280;
+  --w-shadow:     0 8px 32px rgba(0,0,0,.18);
+  --w-fab-shadow: 0 4px 20px rgba(26,107,60,.5);
+  --w-r:          18px;
+  --w-r-sm:       10px;
+  --w-z:          2147483647;
+  --w-w:          370px;
+  --w-h:          580px;
+}
+
+/* ── FAB ──────────────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-fab {
+  position: fixed !important;
+  bottom: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: var(--w-green) !important;
+  color: var(--w-white) !important;
+  border: none !important;
+  border-radius: 50px !important;
+  padding: 14px 22px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  box-shadow: var(--w-fab-shadow) !important;
+  z-index: var(--w-z) !important;
+  transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .2s, opacity .2s !important;
+  user-select: none !important;
+  text-decoration: none !important;
+  outline: none !important;
+}
+#aiagent-widget-root .aiagent-fab--right { right: 24px !important; left: auto !important; }
+#aiagent-widget-root .aiagent-fab--left  { left:  24px !important; right: auto !important; }
+#aiagent-widget-root .aiagent-fab:hover  {
+  background: var(--w-green-dk) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 28px rgba(26,107,60,.6) !important;
+}
+#aiagent-widget-root .aiagent-fab--open  {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(.8) translateY(8px) !important;
+}
+#aiagent-widget-root .aiagent-fab__icon  { font-size: 20px !important; line-height: 1 !important; }
+#aiagent-widget-root .aiagent-fab__label { font-size: 15px !important; font-weight: 600 !important; }
+
+/* ── Panel ────────────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-panel {
+  position: fixed !important;
+  bottom: 24px !important;
+  width: var(--w-w) !important;
+  height: var(--w-h) !important;
+  background: var(--w-white) !important;
+  border-radius: var(--w-r) !important;
+  box-shadow: var(--w-shadow) !important;
+  z-index: var(--w-z) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(24px) scale(.96) !important;
+  transition: opacity .25s cubic-bezier(.4,0,.2,1), transform .25s cubic-bezier(.4,0,.2,1) !important;
+}
+#aiagent-widget-root .aiagent-panel--right { right: 24px !important; left: auto !important; }
+#aiagent-widget-root .aiagent-panel--left  { left:  24px !important; right: auto !important; }
+#aiagent-widget-root .aiagent-panel--open  {
+  opacity: 1 !important;
+  pointer-events: all !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 16px 18px !important;
+  background: linear-gradient(135deg, var(--w-green) 0%, var(--w-green-dk) 100%) !important;
+  color: var(--w-white) !important;
+  flex-shrink: 0 !important;
+}
+#aiagent-widget-root .aiagent-header__avatar {
+  width: 42px !important; height: 42px !important;
+  background: rgba(255,255,255,.18) !important;
+  border-radius: 50% !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  font-size: 22px !important;
+  flex-shrink: 0 !important;
+}
+#aiagent-widget-root .aiagent-header__info  { flex: 1 !important; min-width: 0 !important; }
+#aiagent-widget-root .aiagent-header__title {
+  font-size: 15px !important; font-weight: 700 !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+  color: var(--w-white) !important;
+}
+#aiagent-widget-root .aiagent-header__status {
+  font-size: 11px !important; opacity: .85 !important; margin-top: 3px !important;
+  color: var(--w-white) !important;
+}
+#aiagent-widget-root .aiagent-header__status::before {
+  content: '●' !important; color: var(--w-accent) !important;
+  margin-inline-end: 5px !important; font-size: 9px !important;
+}
+#aiagent-widget-root .aiagent-header__close {
+  background: rgba(255,255,255,.15) !important;
+  border: none !important; color: var(--w-white) !important;
+  width: 32px !important; height: 32px !important; border-radius: 50% !important;
+  font-size: 20px !important; line-height: 1 !important; cursor: pointer !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+#aiagent-widget-root .aiagent-header__close:hover { background: rgba(255,255,255,.3) !important; }
+
+/* ── Messages area ────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-messages {
+  flex: 1 !important; overflow-y: auto !important;
+  padding: 16px 14px !important;
+  display: flex !important; flex-direction: column !important; gap: 8px !important;
+  background: var(--w-bg) !important;
+  scroll-behavior: smooth !important;
+  min-height: 0 !important;
+}
+#aiagent-widget-root .aiagent-messages::-webkit-scrollbar { width: 4px !important; }
+#aiagent-widget-root .aiagent-messages::-webkit-scrollbar-track { background: transparent !important; }
+#aiagent-widget-root .aiagent-messages::-webkit-scrollbar-thumb { background: #c8d0d9 !important; border-radius: 4px !important; }
+
+/* ── Bubbles ──────────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-bubble {
+  max-width: 82% !important;
+  display: flex !important; flex-direction: column !important; gap: 3px !important;
+  animation: aa-pop .18s cubic-bezier(.34,1.56,.64,1) !important;
+  float: none !important;
+}
+@keyframes aa-pop {
+  from { opacity: 0; transform: scale(.9) translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+/* Alignment — these MUST have !important to beat theme resets */
+#aiagent-widget-root .aiagent-bubble--ai       { align-self: flex-start !important; margin-right: auto !important; }
+#aiagent-widget-root .aiagent-bubble--customer { align-self: flex-end   !important; margin-left:  auto !important; }
+#aiagent-widget-root .aiagent-bubble--human    { align-self: flex-start !important; margin-right: auto !important; }
+
+#aiagent-widget-root .aiagent-bubble__body {
+  padding: 10px 14px !important;
+  border-radius: 18px !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  word-break: break-word !important;
+  display: block !important;
+}
+#aiagent-widget-root .aiagent-bubble--ai .aiagent-bubble__body {
+  background: var(--w-white) !important;
+  color: var(--w-text) !important;
+  border-bottom-left-radius: 4px !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08) !important;
+}
+#aiagent-widget-root .aiagent-bubble--customer .aiagent-bubble__body {
+  background: var(--w-green) !important;
+  color: var(--w-white) !important;
+  border-bottom-right-radius: 4px !important;
+}
+#aiagent-widget-root .aiagent-bubble--human .aiagent-bubble__body {
+  background: #fff8e6 !important;
+  color: #7c5700 !important;
+  border-bottom-left-radius: 4px !important;
+  border-left: 3px solid #f6c040 !important;
+}
+#aiagent-widget-root .aiagent-bubble--error .aiagent-bubble__body {
+  background: #fff0f0 !important;
+  color: #c0392b !important;
+  border-left: 3px solid #e74c3c !important;
+  border-radius: var(--w-r-sm) !important;
+}
+#aiagent-widget-root .aiagent-bubble__meta {
+  font-size: 10px !important;
+  color: var(--w-muted) !important;
+  padding: 0 4px !important;
+  display: block !important;
+}
+#aiagent-widget-root .aiagent-bubble--customer .aiagent-bubble__meta { text-align: right !important; }
+
+/* ── Typing indicator ─────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-bubble--typing .aiagent-bubble__body {
+  display: flex !important; align-items: center !important; gap: 5px !important;
+  padding: 12px 16px !important; min-width: 60px !important;
+}
+#aiagent-widget-root .aiagent-typing__dot {
+  width: 7px !important; height: 7px !important;
+  background: #a0aec0 !important;
+  border-radius: 50% !important;
+  animation: aa-bounce 1.2s infinite !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+}
+#aiagent-widget-root .aiagent-typing__dot:nth-child(2) { animation-delay: .2s !important; }
+#aiagent-widget-root .aiagent-typing__dot:nth-child(3) { animation-delay: .4s !important; }
+@keyframes aa-bounce {
+  0%,60%,100% { transform: translateY(0); }
+  30%          { transform: translateY(-7px); }
+}
+
+/* ── Input area ───────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-input-wrap {
+  flex-shrink: 0 !important;
+  background: var(--w-white) !important;
+  border-top: 1px solid var(--w-border) !important;
+  padding: 10px 12px 14px !important;
+  display: flex !important; flex-direction: column !important; gap: 8px !important;
+}
+#aiagent-widget-root .aiagent-input {
+  display: flex !important; align-items: flex-end !important; gap: 8px !important;
+  background: var(--w-bg) !important;
+  border: 1.5px solid var(--w-border) !important;
+  border-radius: 24px !important;
+  padding: 6px 8px 6px 14px !important;
+  transition: border-color .2s !important;
+}
+#aiagent-widget-root .aiagent-input:focus-within {
+  border-color: var(--w-green) !important;
+  background: #fafff8 !important;
+}
+#aiagent-widget-root .aiagent-input__textarea {
+  flex: 1 !important; background: transparent !important;
+  border: none !important; outline: none !important; resize: none !important;
+  font-size: 14px !important; color: var(--w-text) !important;
+  line-height: 1.5 !important; max-height: 100px !important;
+  padding: 4px 0 !important; overflow-y: auto !important;
+  min-height: 28px !important;
+}
+#aiagent-widget-root .aiagent-input__textarea::placeholder { color: var(--w-muted) !important; }
+#aiagent-widget-root .aiagent-input__send {
+  background: var(--w-green) !important;
+  color: var(--w-white) !important;
+  border: none !important; border-radius: 50% !important;
+  width: 36px !important; height: 36px !important;
+  font-size: 15px !important; cursor: pointer !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  flex-shrink: 0 !important;
+  transition: background .15s, transform .15s !important;
+}
+#aiagent-widget-root .aiagent-input__send:not(:disabled):hover {
+  background: var(--w-green-dk) !important; transform: scale(1.1) !important;
+}
+#aiagent-widget-root .aiagent-input__send:disabled { background: #c1c9d4 !important; cursor: not-allowed !important; }
+#aiagent-widget-root .aiagent-input__photo {
+  background: none !important; border: none !important;
+  color: var(--w-muted) !important;
+  font-size: 18px !important; cursor: pointer !important;
+  padding: 4px 2px !important; line-height: 1 !important; flex-shrink: 0 !important;
+}
+#aiagent-widget-root .aiagent-input__photo:hover   { color: var(--w-green) !important; }
+#aiagent-widget-root .aiagent-input__photo:disabled { opacity: .4 !important; cursor: not-allowed !important; }
+
+/* ── Escalate ─────────────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-escalate { text-align: center !important; }
+#aiagent-widget-root .aiagent-escalate__btn {
+  background: none !important; border: none !important;
+  color: var(--w-muted) !important; font-size: 12px !important;
+  cursor: pointer !important; text-decoration: underline !important;
+}
+#aiagent-widget-root .aiagent-escalate__btn:hover { color: var(--w-green) !important; }
+#aiagent-widget-root .aiagent-escalate-prompt {
+  align-self: center !important;
+  background: var(--w-green-lt) !important;
+  color: var(--w-green) !important;
+  border: 1.5px solid var(--w-green) !important;
+  border-radius: 50px !important;
+  padding: 8px 20px !important;
+  font-size: 13px !important; font-weight: 600 !important;
+  cursor: pointer !important;
+  margin: 4px 0 !important;
+}
+#aiagent-widget-root .aiagent-escalate-prompt:hover { background: #c8e6d4 !important; }
+
+/* ── Verification form ────────────────────────────────────────────────── */
+#aiagent-widget-root .aiagent-verify-form {
+  background: var(--w-white) !important;
+  border: 1.5px solid var(--w-border) !important;
+  border-radius: var(--w-r-sm) !important;
+  padding: 16px !important;
+  align-self: stretch !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.07) !important;
+}
+#aiagent-widget-root .aiagent-verify-form__title {
+  font-size: 13px !important; font-weight: 700 !important;
+  color: var(--w-green) !important; margin-bottom: 12px !important; display: block !important;
+}
+#aiagent-widget-root .aiagent-verify-form__field { margin-bottom: 10px !important; display: block !important; }
+#aiagent-widget-root .aiagent-verify-form__field label {
+  display: block !important; font-size: 11px !important; font-weight: 600 !important;
+  color: var(--w-muted) !important; margin-bottom: 4px !important;
+  text-transform: uppercase !important; letter-spacing: .4px !important;
+  float: none !important; width: auto !important;
+}
+#aiagent-widget-root .aiagent-verify-form__input {
+  display: block !important; width: 100% !important;
+  border: 1.5px solid var(--w-border) !important;
+  border-radius: var(--w-r-sm) !important;
+  padding: 9px 12px !important; font-size: 13px !important;
+  color: var(--w-text) !important; outline: none !important;
+  background: var(--w-bg) !important;
+  transition: border-color .2s !important;
+  height: auto !important;
+}
+#aiagent-widget-root .aiagent-verify-form__input:focus {
+  border-color: var(--w-green) !important; background: #fff !important;
+}
+#aiagent-widget-root .aiagent-verify-form__status {
+  font-size: 12px !important; color: #c0392b !important;
+  margin-bottom: 8px !important; min-height: 16px !important; display: block !important;
+}
+#aiagent-widget-root .aiagent-verify-form__actions {
+  display: flex !important; gap: 8px !important; margin-top: 4px !important;
+}
+#aiagent-widget-root .aiagent-verify-form__submit {
+  flex: 1 !important; background: var(--w-green) !important; color: var(--w-white) !important;
+  border: none !important; border-radius: var(--w-r-sm) !important;
+  padding: 10px !important; font-size: 13px !important; font-weight: 600 !important;
+  cursor: pointer !important;
+}
+#aiagent-widget-root .aiagent-verify-form__submit:hover:not(:disabled) { background: var(--w-green-dk) !important; }
+#aiagent-widget-root .aiagent-verify-form__submit:disabled { opacity: .6 !important; cursor: not-allowed !important; }
+#aiagent-widget-root .aiagent-verify-form__cancel {
+  background: none !important; border: 1.5px solid var(--w-border) !important;
+  border-radius: var(--w-r-sm) !important;
+  padding: 10px 14px !important; font-size: 13px !important;
+  cursor: pointer !important; color: var(--w-muted) !important;
+}
+
+/* ── Mobile ───────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #aiagent-widget-root .aiagent-panel {
+    width: 100vw !important; height: 100dvh !important;
+    bottom: 0 !important; right: 0 !important; left: 0 !important;
+    border-radius: 0 !important;
+  }
+  #aiagent-widget-root .aiagent-fab {
+    bottom: 16px !important; right: 16px !important; left: auto !important;
+  }
+}
