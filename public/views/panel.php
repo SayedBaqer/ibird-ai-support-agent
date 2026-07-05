@@ -206,6 +206,16 @@ body{
 .vf-submit:hover:not(:disabled){background:#145530}
 .vf-submit:disabled{opacity:.6;cursor:not-allowed}
 .vf-cancel{background:none;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 16px;font-family:inherit;font-size:14px;cursor:pointer;color:#64748b;-webkit-appearance:none}
+
+/* ── PDPL consent bar ─────────────────────────────────────────────── */
+.privacy-bar{
+  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  background:#fffbeb;border-bottom:1px solid #fde68a;
+  padding:7px 14px;font-size:11px;color:#92400e;line-height:1.4;
+  gap:8px;
+}
+.privacy-bar a{color:#92400e;font-weight:600;}
+.privacy-bar-x{background:none;border:none;color:#92400e;cursor:pointer;font-size:15px;line-height:1;padding:0 2px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -218,6 +228,13 @@ body{
     <div class="hdr-stat"><span class="hdr-dot"></span><span id="hdr-sub">Online · Replies instantly</span></div>
   </div>
   <button class="hdr-x" id="close-btn" aria-label="Close">×</button>
+</div>
+
+<!-- PDPL consent notice — shown once per browser session, dismissed by ✕ -->
+<div class="privacy-bar" id="privacy-bar" role="note" aria-label="Privacy notice"
+  style="<?php echo ( isset( $_COOKIE['aa_privacy_ok'] ) ? 'display:none' : '' ); ?>">
+  <span>🔒 This chat is powered by Google AI (Gemini). By chatting you agree to our use of AI for support. No personal data is shared with AI.</span>
+  <button class="privacy-bar-x" id="privacy-ok" aria-label="Dismiss">✕</button>
 </div>
 
 <!-- Messages -->
@@ -252,6 +269,17 @@ var TITLE_AR     = '<?php echo esc_js( $settings['widget_title_ar'] ); ?>';
 var FB_EN        = '<?php echo esc_js( $settings['fallback_message_en'] ); ?>';
 var FB_AR        = '<?php echo esc_js( $settings['fallback_message_ar'] ); ?>';
 var CTX_PRODUCT  = <?php echo $ctx_product_data ? wp_json_encode( $ctx_product_data ) : 'null'; ?>;
+
+/* ── Privacy bar dismiss ─────────────────────────────────────────── */
+var $privacyBar = document.getElementById('privacy-bar');
+var $privacyOk  = document.getElementById('privacy-ok');
+if ($privacyOk) {
+  $privacyOk.addEventListener('click', function() {
+    $privacyBar.style.display = 'none';
+    // Session cookie — dismissed for this browser session.
+    document.cookie = 'aa_privacy_ok=1; path=/; SameSite=Lax';
+  });
+}
 
 /* ── DOM refs ─────────────────────────────────────────────────────── */
 var $msgs      = document.getElementById('msgs');

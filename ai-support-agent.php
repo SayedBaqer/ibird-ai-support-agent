@@ -14,11 +14,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AIAGENT_VERSION',    '1.1.0' );
+define( 'AIAGENT_VERSION',    '1.2.0' );
 define( 'AIAGENT_FILE',       __FILE__ );
 define( 'AIAGENT_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'AIAGENT_URL',        plugin_dir_url( __FILE__ ) );
-define( 'AIAGENT_DB_VER',     '3' );
+define( 'AIAGENT_DB_VER',     '4' );
 define( 'AIAGENT_GITHUB_REPO', 'SayedBaqer/ibird-ai-support-agent' );
 
 // ── Autoload includes ────────────────────────────────────────────────────────
@@ -72,9 +72,9 @@ function aiagent_default_settings() {
 	return [
 		// Primary provider — Gemini.
 		'api_key'             => '',
-		'model_reply'         => 'gemini-1.5-flash',
-		'model_classify'      => 'gemini-1.5-flash-8b',
-		'model_embed'         => 'text-embedding-004',
+		'model_reply'         => 'gemini-2.5-flash',
+		'model_classify'      => 'gemini-2.5-flash-lite',
+		'model_embed'         => 'gemini-embedding-2',
 		// Fallback provider 1 — Groq (OpenAI-compatible).
 		'groq_api_key'        => '',
 		'groq_model'          => 'llama-3.3-70b-versatile',
@@ -82,16 +82,21 @@ function aiagent_default_settings() {
 		'cerebras_api_key'    => '',
 		'cerebras_model'      => 'llama-3.3-70b',
 		// Gemini advanced features (Gemini-only; ignored by Groq/Cerebras fallback).
-		'enable_search_grounding' => false,  // Gemini searches the web when it needs more info.
-		'enable_thinking'         => false,  // Gemini thinks before responding (slower, smarter).
-		'thinking_budget'         => 1024,   // Thinking token budget (0 = off, max 8192).
+		'enable_search_grounding' => false,
+		'enable_thinking'         => false,
+		'thinking_budget'         => 1024,
 		// GitHub auto-update (private repo PAT with contents:read scope).
 		'github_token'            => '',
+		// Escalation notifications.
+		'whatsapp_number'         => '',  // WhatsApp number to notify on escalation (intl format: +973XXXXXXXX).
+		'notify_email'            => '',  // Email to CC on new tickets (leave blank to use admin email).
 		// Throttle.
 		'daily_cap'           => 1200,
 		'session_cap'         => 20,
 		'per_customer_cap'    => 30,
 		'languages'           => [ 'en', 'ar' ],
+		// Data retention — PDPL compliance (Bahrain): auto-purge chat logs older than N days.
+		'data_retention_days' => 90,
 		// Widget.
 		'fallback_message_en' => 'Thank you for reaching out! Our team will follow up with you shortly.',
 		'fallback_message_ar' => 'شكراً للتواصل معنا! سيتواصل معك فريقنا قريباً.',
@@ -133,6 +138,49 @@ function aiagent_boot() {
 	if ( is_admin() ) {
 		AIAgent_Admin::init();
 	}
+}
+
+// ── Data Retention Cron (PDPL / Bahrain compliance) ─────────────────────────
+// Auto-purges chat logs and semantic cache entries older than data_retention_days.
+// Runs once per day via WP-Cron; retention period is configurable in Settings.
+
+register_activation_hook( __FILE__, 'aiagent_schedule_retention' );
+register_deactivation_hook( __FILE__, 'aiagent_unschedule_retention' );
+
+function aiagent_schedule_retention(): void {
+	if ( ! wp_next_scheduled( 'aiagent_retention_cron' ) ) {
+		wp_schedule_event( time(), 'daily', 'aiagent_retention_cron' );
+	}
+}
+
+function aiagent_unschedule_retention(): void {
+	$ts = wp_next_scheduled( 'aiagent_retention_cron' );
+	if ( $ts ) wp_unschedule_event( $ts, 'aiagent_retention_cron' );
+}
+
+add_action( 'aiagent_retention_cron', 'aiagent_run_retention' );
+function aiagent_run_retention(): void {
+	global $wpdb;
+	$days = (int) ( aiagent_settings()['data_retention_days'] ?? 90 );
+	if ( $days <= 0 ) return;
+
+	// Purge old conversations (and their messages/tickets via the JOIN).
+	$cutoff = gmdate( 'Y-m-d H:i:s', strtotime( "-{$days} days" ) );
+
+	$old_conv_ids = $wpdb->get_col( $wpdb->prepare(
+		"SELECT id FROM {$wpdb->prefix}aiagent_conversations WHERE created_at < %s",
+		$cutoff
+	) );
+
+	if ( ! empty( $old_conv_ids ) ) {
+		$ids_in = implode( ',', array_map( 'absint', $old_conv_ids ) );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}aiagent_messages WHERE conversation_id IN ({$ids_in})" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}aiagent_tickets  WHERE conversation_id IN ({$ids_in})" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}aiagent_conversations WHERE id IN ({$ids_in})" );
+	}
+
+	// Purge expired semantic cache entries.
+	$wpdb->query( "DELETE FROM {$wpdb->prefix}aiagent_semantic_cache WHERE expires_at < NOW()" );
 }
 
 // ── GitHub Auto-Updater ───────────────────────────────────────────────────────

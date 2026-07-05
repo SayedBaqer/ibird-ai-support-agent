@@ -229,6 +229,11 @@ class AIAgent_Admin {
 			'thinking_budget'         => max( 256, min( 8192, absint( $post['thinking_budget'] ?? 1024 ) ) ),
 			// GitHub auto-update.
 			'github_token'            => sanitize_text_field( wp_unslash( $post['github_token'] ?? $current['github_token'] ?? '' ) ),
+			// Escalation notifications.
+			'notify_email'        => sanitize_email( $post['notify_email']      ?? $current['notify_email'] ?? '' ),
+			'whatsapp_number'     => sanitize_text_field( $post['whatsapp_number'] ?? $current['whatsapp_number'] ?? '' ),
+			// Data retention (PDPL compliance).
+			'data_retention_days' => max( 30, min( 365, absint( $post['data_retention_days'] ?? $current['data_retention_days'] ?? 90 ) ) ),
 			// Throttle.
 			'daily_cap'           => absint( $post['daily_cap']        ?? $current['daily_cap'] ),
 			'session_cap'         => absint( $post['session_cap']      ?? $current['session_cap'] ),

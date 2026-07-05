@@ -102,7 +102,10 @@ class AIAgent_Tools {
 				);
 
 			case 'search_taught_examples':
-				return self::search_taught_examples( sanitize_text_field( $args['question'] ?? '' ) );
+				return self::search_taught_examples(
+					sanitize_text_field( $args['question'] ?? '' ),
+					$context['lang'] ?? ''
+				);
 
 			case 'escalate_to_human':
 				return self::escalate_to_human(
@@ -222,12 +225,12 @@ class AIAgent_Tools {
 
 	// ── Tool: search_taught_examples (both modes) ─────────────────────────────
 
-	public static function search_taught_examples( string $question ): string {
+	public static function search_taught_examples( string $question, string $lang = '' ): string {
 		if ( $question === '' ) {
 			return 'No question provided.';
 		}
 
-		$results = AIAgent_RAG::search_taught_examples( $question, 3 );
+		$results = AIAgent_RAG::search_taught_examples( $question, 3, $lang );
 
 		if ( empty( $results ) ) {
 			return 'No matching knowledge base entries found.';
@@ -272,6 +275,53 @@ class AIAgent_Tools {
 			[ '%s' ], [ '%d' ]
 		);
 
+		// Notify the admin team immediately — email always, WhatsApp link if configured.
+		self::notify_escalation( $ticket_id, $reason, $conversation_id );
+
 		return "Escalation ticket #{$ticket_id} created. A specialist will follow up shortly.";
+	}
+
+	// ── Escalation notification ───────────────────────────────────────────────
+
+	private static function notify_escalation( int $ticket_id, string $reason, int $conversation_id ): void {
+		$settings       = aiagent_settings();
+		$admin_email    = $settings['notify_email'] ?: get_option( 'admin_email' );
+		$whatsapp_num   = trim( $settings['whatsapp_number'] ?? '' );
+		$admin_url      = admin_url( 'admin.php?page=aiagent-tickets' );
+		$ticket_url     = admin_url( "admin.php?page=aiagent-tickets&ticket_id={$ticket_id}" );
+
+		// ── Email notification ────────────────────────────────────────────────
+		if ( $admin_email ) {
+			$subject = "[iBird Support] New Escalation Ticket #{$ticket_id}";
+			$body    = "A customer conversation has been escalated.\n\n"
+				. "Ticket #: {$ticket_id}\n"
+				. "Conversation ID: {$conversation_id}\n"
+				. "Reason: {$reason}\n\n"
+				. "Review ticket: {$ticket_url}\n\n"
+				. "All tickets: {$admin_url}";
+
+			wp_mail( $admin_email, $subject, $body, [
+				'Content-Type: text/plain; charset=UTF-8',
+				'From: iBird AI Support <' . $admin_email . '>',
+			] );
+		}
+
+		// ── WhatsApp deep-link (GCC market standard) ──────────────────────────
+		// Sends the admin a pre-composed WhatsApp message they can tap to open.
+		// Uses the wa.me API — no server-side WhatsApp API key required for this
+		// basic flow. For full automation, replace with Twilio or 360dialog API.
+		if ( $whatsapp_num !== '' ) {
+			$whatsapp_num = preg_replace( '/[^0-9+]/', '', $whatsapp_num );
+			$text         = rawurlencode(
+				"iBird Support Alert: New ticket #{$ticket_id}\n"
+				. "Reason: {$reason}\n"
+				. "Review: {$ticket_url}"
+			);
+			// Log the WhatsApp deep-link so admin can tap it from their device.
+			// (A full Twilio/360dialog integration can replace this with a real API POST.)
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( "[AIAgent Escalation] WhatsApp link: https://wa.me/{$whatsapp_num}?text={$text}" );
+			}
+		}
 	}
 }

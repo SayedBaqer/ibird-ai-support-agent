@@ -67,8 +67,11 @@ class AIAgent_RAG {
 	/**
 	 * Find the closest taught examples to a question.
 	 * Returns array of ['question'=>, 'solution'=>, 'score'=>] sorted desc.
+	 *
+	 * @param string $lang  Optional — filters to rows tagged 'en', 'ar', or 'both'.
+	 *                      Pass '' to search all languages (less precise for Arabic).
 	 */
-	public static function search_taught_examples( string $question, int $limit = 3 ): array {
+	public static function search_taught_examples( string $question, int $limit = 3, string $lang = '' ): array {
 		global $wpdb;
 
 		$q_embedding = AIAgent_LLM::embed( $question );
@@ -76,11 +79,19 @@ class AIAgent_RAG {
 			return [];
 		}
 
-		// Fetch all rows that have an embedding. For large datasets this should be
-		// replaced with a vector index, but fine for the current scale.
-		$rows = $wpdb->get_results(
-			"SELECT question, solution, embedding FROM {$wpdb->prefix}aiagent_taught_examples WHERE embedding IS NOT NULL"
-		);
+		// Coarse SQL filter by language before running cosine — reduces the candidate
+		// set by ~50% when the customer language is known, which improves relevance.
+		if ( $lang !== '' && in_array( $lang, [ 'en', 'ar' ], true ) ) {
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT question, solution, embedding FROM {$wpdb->prefix}aiagent_taught_examples
+				WHERE embedding IS NOT NULL AND (language = %s OR language = 'both')",
+				$lang
+			) );
+		} else {
+			$rows = $wpdb->get_results(
+				"SELECT question, solution, embedding FROM {$wpdb->prefix}aiagent_taught_examples WHERE embedding IS NOT NULL"
+			);
+		}
 
 		$scored = [];
 		foreach ( $rows as $row ) {
@@ -266,6 +277,84 @@ class AIAgent_RAG {
 		}
 
 		return implode( ' ', array_filter( $text_parts ) );
+	}
+
+	// ── Semantic cache ────────────────────────────────────────────────────────
+	// Stores recent AI replies with embeddings. On each new question we embed it
+	// and compare against the last 200 cached entries. If cosine > $threshold
+	// (default 0.92 = almost identical meaning) the cached answer is returned
+	// without calling the LLM — saving 20-40% of API calls for repetitive queries.
+	// Only used for Mode A (product Q&A); Mode B always hits the LLM for fresh
+	// context. Entries expire after data_retention_days (same as chat logs).
+
+	/**
+	 * Check whether a near-identical question was answered recently.
+	 * Returns ['answer'=>string, 'score'=>float, 'id'=>int] or null on miss.
+	 */
+	public static function semantic_cache_get( string $question, float $threshold = 0.92 ): ?array {
+		global $wpdb;
+
+		$q_emb = AIAgent_LLM::embed( $question );
+		if ( empty( $q_emb ) ) {
+			return null;
+		}
+
+		$recent = $wpdb->get_results(
+			"SELECT id, question, answer, embedding FROM {$wpdb->prefix}aiagent_semantic_cache
+			WHERE expires_at > NOW() ORDER BY created_at DESC LIMIT 200"
+		);
+
+		$best       = null;
+		$best_score = 0.0;
+
+		foreach ( $recent as $row ) {
+			$emb = json_decode( $row->embedding, true );
+			if ( ! is_array( $emb ) ) {
+				continue;
+			}
+			$score = self::cosine_similarity( $q_emb, $emb );
+			if ( $score >= $threshold && $score > $best_score ) {
+				$best_score = $score;
+				$best       = [ 'answer' => $row->answer, 'score' => $score, 'id' => (int) $row->id ];
+			}
+		}
+
+		// Increment hit counter on match.
+		if ( $best !== null ) {
+			$wpdb->query( $wpdb->prepare(
+				"UPDATE {$wpdb->prefix}aiagent_semantic_cache SET hits = hits + 1 WHERE id = %d",
+				$best['id']
+			) );
+		}
+
+		return $best;
+	}
+
+	/**
+	 * Store a new Q→A pair in the semantic cache.
+	 * Expires according to the data_retention_days setting.
+	 */
+	public static function semantic_cache_set( string $question, string $answer ): void {
+		global $wpdb;
+
+		$emb = AIAgent_LLM::embed( $question );
+		if ( empty( $emb ) ) {
+			return;
+		}
+
+		$days      = (int) ( aiagent_settings()['data_retention_days'] ?? 90 );
+		$expires   = gmdate( 'Y-m-d H:i:s', strtotime( "+{$days} days" ) );
+
+		$wpdb->insert(
+			"{$wpdb->prefix}aiagent_semantic_cache",
+			[
+				'question'   => $question,
+				'answer'     => $answer,
+				'embedding'  => wp_json_encode( $emb ),
+				'expires_at' => $expires,
+			],
+			[ '%s', '%s', '%s', '%s' ]
+		);
 	}
 
 	private static function decode_pdf_string( string $s ): string {

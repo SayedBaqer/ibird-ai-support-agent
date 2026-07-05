@@ -21,17 +21,18 @@
         </div>
         <div class="aa-field">
           <label>Reply Model ID</label>
-          <input type="text" class="aa-input" name="model_reply" value="<?php echo esc_attr($settings['model_reply']); ?>" placeholder="gemini-1.5-flash">
+          <input type="text" class="aa-input" name="model_reply" value="<?php echo esc_attr($settings['model_reply']); ?>" placeholder="gemini-2.5-flash">
+          <div class="aa-field__desc">Recommended: <code>gemini-2.5-flash</code> (best value, 1M context).</div>
         </div>
         <div class="aa-field">
           <label>Classify Model ID</label>
-          <input type="text" class="aa-input" name="model_classify" value="<?php echo esc_attr($settings['model_classify']); ?>" placeholder="gemini-1.5-flash-8b">
-          <div class="aa-field__desc">Used for cheap intent detection (Mode A vs B).</div>
+          <input type="text" class="aa-input" name="model_classify" value="<?php echo esc_attr($settings['model_classify']); ?>" placeholder="gemini-2.5-flash-lite">
+          <div class="aa-field__desc">Used for cheap intent detection. Recommended: <code>gemini-2.5-flash-lite</code>.</div>
         </div>
         <div class="aa-field">
           <label>Embedding Model ID</label>
-          <input type="text" class="aa-input" name="model_embed" value="<?php echo esc_attr($settings['model_embed']); ?>" placeholder="text-embedding-004">
-          <div class="aa-field__desc">Powers the knowledge base search (RAG).</div>
+          <input type="text" class="aa-input" name="model_embed" value="<?php echo esc_attr($settings['model_embed']); ?>" placeholder="gemini-embedding-2">
+          <div class="aa-field__desc">Recommended: <code>gemini-embedding-2</code> — supports Arabic + 8K context. <strong>Note:</strong> <code>text-embedding-004</code> was discontinued Jan 2026.</div>
         </div>
       </div>
     </div>
@@ -167,6 +168,64 @@
             <span class="aa-usage__count"><?php echo number_format($used); ?> / <?php echo number_format($cap); ?> requests (<?php echo $pct; ?>%)</span>
           </div>
           <div class="aa-progress"><div class="aa-progress__bar <?php echo esc_attr($bar_class); ?>" style="width:<?php echo $pct; ?>%;"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Escalation Notifications ─────────────────────────────────────────── -->
+    <div class="aa-section-title">📲 Escalation Notifications</div>
+    <div class="aa-card">
+      <p style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        When a customer conversation is escalated to a human agent, the plugin sends an email notification automatically.
+        Optionally provide a WhatsApp number for a tap-to-open WhatsApp alert (GCC standard).
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="aa-field">
+          <label>Notify Email</label>
+          <input type="email" class="aa-input" name="notify_email"
+            value="<?php echo esc_attr( $settings['notify_email'] ?? '' ); ?>"
+            placeholder="<?php echo esc_attr( get_option('admin_email') ); ?>">
+          <div class="aa-field__desc">Leave blank to use the WordPress admin email.</div>
+        </div>
+        <div class="aa-field">
+          <label>WhatsApp Number (for alerts)</label>
+          <input type="text" class="aa-input" name="whatsapp_number"
+            value="<?php echo esc_attr( $settings['whatsapp_number'] ?? '' ); ?>"
+            placeholder="+97333XXXXXX">
+          <div class="aa-field__desc">International format. A WhatsApp deep-link is logged on escalation so the admin can tap to reply. Standard in Bahrain/GCC.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Data Retention (PDPL Compliance) ──────────────────────────────── -->
+    <div class="aa-section-title">🔒 Data Retention &amp; Privacy (PDPL)</div>
+    <div class="aa-card">
+      <p style="color:#64748b;font-size:13px;margin-bottom:16px;">
+        Bahrain's Personal Data Protection Law (PDPL) requires a defined data retention period.
+        Chat logs, messages, and semantic cache entries older than the configured number of days
+        are automatically deleted by a daily background job. <strong>Minimum recommended: 30 days. Maximum: 365 days.</strong>
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="aa-field">
+          <label>Chat Log Retention (days)</label>
+          <input type="number" class="aa-input" name="data_retention_days"
+            value="<?php echo esc_attr( $settings['data_retention_days'] ?? 90 ); ?>"
+            min="30" max="365">
+          <div class="aa-field__desc">Conversations and messages older than this are purged daily. Tickets are purged too. Taught examples and manual chunks are kept indefinitely.</div>
+        </div>
+        <div class="aa-field" style="display:flex;flex-direction:column;justify-content:center;">
+          <?php
+          $next_run = wp_next_scheduled( 'aiagent_retention_cron' );
+          if ( $next_run ) {
+            echo '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;font-size:13px;color:#166534;">';
+            echo '✅ Retention job scheduled — next run: <strong>' . esc_html( get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $next_run ), 'D j M H:i' ) ) . '</strong>';
+            echo '</div>';
+          } else {
+            echo '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;font-size:13px;color:#991b1b;">';
+            echo '⚠️ Retention cron not scheduled. Deactivate and reactivate the plugin to register it.';
+            echo '</div>';
+          }
+          ?>
         </div>
       </div>
     </div>

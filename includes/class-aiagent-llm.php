@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
  * LLM client with provider router.
  *
  * Provider priority:
- *  1. Gemini (Flash for reply, Flash-Lite for classify, text-embedding-004 for embed)
+ *  1. Gemini (gemini-2.5-flash for reply, gemini-2.5-flash-lite for classify, gemini-embedding-2 for embed)
  *     ↳ Supports: Google Search grounding, thinking mode (both Gemini-only).
  *  2. Groq  (llama-3.3-70b-versatile) — OpenAI-compatible, generous free tier
  *  3. Cerebras (llama-3.3-70b) — OpenAI-compatible, fastest inference
@@ -93,7 +93,8 @@ class AIAgent_LLM {
 		$messages = [ [ 'role' => 'user', 'parts' => [ [ 'text' => $prompt ] ] ] ];
 
 		if ( $settings['api_key'] !== '' ) {
-			$result = self::gemini_reply( $messages, [], [], $lang, $settings['model_classify'], [] );
+			// Classification only needs a short label — cap at 256 tokens to cut cost.
+			$result = self::gemini_reply( $messages, [], [], $lang, $settings['model_classify'], [ 'max_output_tokens' => 256 ] );
 			if ( ! $result['error'] ) return trim( $result['reply'] );
 		}
 
@@ -350,8 +351,12 @@ class AIAgent_LLM {
 			}
 		}
 
-		// ── Generation config: thinking mode increases output token budget ───
-		$gen_config = [ 'temperature' => 0.4, 'maxOutputTokens' => $use_thinking ? 8192 : 2048 ];
+		// ── Generation config — token budget by request type ─────────────────
+		// Support answers rarely exceed 400 tokens; capping at 512 reduces output
+		// cost vs the old 2048 default. Thinking mode needs headroom for reasoning.
+		$default_max  = $use_thinking ? 8192 : 512;
+		$max_tokens   = (int) ( $opts['max_output_tokens'] ?? $default_max );
+		$gen_config   = [ 'temperature' => 0.4, 'maxOutputTokens' => $max_tokens ];
 		if ( $use_thinking && $t_budget > 0 ) {
 			$gen_config['thinkingConfig'] = [ 'thinkingBudget' => $t_budget ];
 		}
