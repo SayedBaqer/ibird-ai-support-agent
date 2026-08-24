@@ -1379,7 +1379,10 @@ class AIAgent_REST {
 		$options        = []; // May receive cache_name after a search_manual tool call.
 		$result         = [ 'error' => false, 'reply' => '', 'tool_calls' => null, 'grounding' => null ];
 
-		for ( $i = 0; $i < 3; $i++ ) {
+		// 5 rounds, not 3 — a genuine multi-step lookup (e.g. search_products fails,
+		// retry search_taught_examples, then search_common_knowledge) can legitimately
+		// need more than 3 tool-call rounds before the model is ready to answer in text.
+		for ( $i = 0; $i < 5; $i++ ) {
 			$result = AIAgent_LLM::reply(
 				$llm_messages,
 				$system,
@@ -1440,6 +1443,19 @@ class AIAgent_REST {
 			break;
 		}
 
+		// Safety net: if we ran out of rounds while the model was STILL mid tool-call
+		// (not a provider error — it just needed more steps than the budget allowed),
+		// force one last call with no tools so it must summarize whatever the tool
+		// results so far actually found, instead of silently showing the generic
+		// "our team will follow up" fallback despite having real search results in hand.
+		if ( $final_reply === '' && ! $result['error'] ) {
+			$cost++;
+			$forced = AIAgent_LLM::reply( $llm_messages, $system, [], $lang, $options );
+			if ( ! $forced['error'] && trim( $forced['reply'] ) !== '' ) {
+				$final_reply = $forced['reply'];
+			}
+		}
+
 		if ( $final_reply === '' ) {
 			$final_reply = AIAgent_I18n::setting_string( 'fallback_message', $lang );
 		}
@@ -1484,6 +1500,7 @@ class AIAgent_REST {
 			'SEARCH PERSISTENCE: customers write shorthand, typos, and merged words — e.g. "22egg" likely means a model with a 22-egg capacity. If a search tool (search_products/search_manual/search_taught_examples/search_common_knowledge) returns nothing, do not immediately tell the customer nothing was found or ask a generic clarifying question — try again with a normalized or rephrased query first (split merged words/numbers, fix likely typos, try a synonym or the underlying category). Only ask the customer to clarify after a genuine second attempt still finds nothing.',
 			'ESCALATION IS A LAST RESORT, NOT A FIRST RESPONSE: only call escalate_to_human when (a) the customer explicitly asks for a person/human/agent, or (b) you have already made a genuine search attempt (including a rephrase) for a real support issue and it truly cannot be resolved from what the tools return. Never escalate just because a first search came back empty, or as a reflex for an ordinary question — search again or ask ONE clarifying question instead. If a ticket for this conversation is already open, do not escalate again; tell the customer a specialist is already on it.',
 			'If, after genuinely trying, you still cannot help, say so honestly and ASK the customer whether they\'d like you to connect them to a specialist — only call escalate_to_human after they agree (or already asked for a human up front).',
+			'NEVER promise "our team will follow up" / ask the customer to leave their number or contact details UNLESS you are actually calling escalate_to_human in that same turn. A spoken promise with no ticket behind it loses the customer\'s request entirely — either solve it now with the tools available, or actually escalate.',
 		];
 
 		if ( $mode === 'support' && $verified_model !== null ) {

@@ -168,8 +168,25 @@ class AIAgent_Tools {
 			}
 		}
 
+		// WordPress/WooCommerce's multi-word search requires EVERY word to match
+		// (AND, not OR) — so "small incubator" finds nothing when the product is
+		// simply titled "Incubator" with no literal word "small" anywhere, even
+		// though it's obviously the right product. Fall back to searching each
+		// significant word on its own and merging the results.
+		if ( empty( $ids ) && mb_strpos( trim( $query ), ' ' ) !== false ) {
+			$words  = array_filter( preg_split( '/\s+/', trim( $query ) ), fn( $w ) => mb_strlen( $w ) > 2 );
+			$merged = [];
+			foreach ( $words as $word ) {
+				foreach ( self::do_product_search( $word ) as $id ) {
+					$merged[ $id ] = true;
+					if ( count( $merged ) >= 5 ) break 2;
+				}
+			}
+			$ids = array_keys( $merged );
+		}
+
 		if ( empty( $ids ) ) {
-			return 'No matching products found for "' . $query . '". If this looks like shorthand, a typo, or a merged word/number, try rephrasing the query (e.g. split numbers from words) before telling the customer nothing was found.';
+			return 'No matching products found for "' . $query . '" even after retrying with a normalized query and each individual word. Ask the customer a clarifying question (e.g. size/capacity/budget/category) instead of saying nothing is available — do not conclude the store lacks this product from one failed search.';
 		}
 
 		$lines = [];
