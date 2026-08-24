@@ -515,9 +515,13 @@ class AIAgent_REST {
 		self::log_message( $conv_id, 'customer', $body, $attachment_url );
 
 		// ── Step 1: Gemini Vision — describe what's in the photo ──────────────
+		// NOTE: deliberately asks about branding/logo (product identity, not PII)
+		// to help judge whether this looks like a genuine catalogue product — but
+		// does NOT ask it to read out a serial number, per HARD RULE 1: a serial is
+		// PII and must never be sent to/extracted via the LLM.
 		$vision_prompt = $lang === 'ar'
-			? 'صف هذه الصورة بالتفصيل: ما هو المنتج، ما هو الموديل المرئي، أي رسائل خطأ أو أكواد على الشاشة، أي تلف أو مشكلة واضحة، أي نصوص أو ملصقات مرئية. أجب بالعربية.'
-			: 'Describe this image in detail for a product support context: what product is shown, what model (if visible), any error codes or messages on a display, any visible damage or fault, any labels or serial numbers visible. Be specific and technical.';
+			? 'صف هذه الصورة بالتفصيل: ما هو المنتج، ما هو الموديل المرئي، هل يظهر شعار العلامة التجارية أو اسمها على الجهاز، أي رسائل خطأ أو أكواد على الشاشة، أي تلف أو مشكلة واضحة. لا تقرأ أو تكتب أي رقم تسلسلي حتى لو كان مرئياً. أجب بالعربية.'
+			: 'Describe this image in detail for a product support context: what product is shown, what model (if visible), whether a brand logo or name is visible on the unit, any error codes or messages on a display, any visible damage or fault. Do NOT read out or transcribe any serial number even if one is visible — just note that one is present. Be specific and technical otherwise.';
 
 		$vision_opts = $gemini_file_uri !== ''
 			? [ 'gemini_file_uri' => $gemini_file_uri, 'gemini_file_mime' => $gemini_file_mime ]
