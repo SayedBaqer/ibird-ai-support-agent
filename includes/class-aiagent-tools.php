@@ -3,6 +3,14 @@ defined( 'ABSPATH' ) || exit;
 
 class AIAgent_Tools {
 
+	/**
+	 * Set by the request_verification tool when the AI decides the customer needs
+	 * to prove ownership (warranty/replacement/repair). The reply layer reads this
+	 * after the tool loop and surfaces it as needs_verification so the widget shows
+	 * the verification form — reset per turn by the caller (run_agent_loop).
+	 */
+	public static bool $requested_verification = false;
+
 	// ── Tool declarations for Gemini function-calling ─────────────────────────
 
 	/**
@@ -67,6 +75,24 @@ class AIAgent_Tools {
 					'required' => [ 'query' ],
 				],
 			] );
+
+			// The customer is not yet verified in this mode (verification is what
+			// promotes them to 'support'). Call this ONLY once you've established
+			// they need something unit-specific — warranty status, a replacement, or
+			// repair authorization — that you genuinely cannot help with otherwise.
+			// This is what actually shows them the verification form; saying
+			// "please verify" in text alone does not.
+			$common[] = [
+				'name'        => 'request_verification',
+				'description' => 'Show the customer the ownership verification form (model + serial + contact) so they can prove ownership. Use this only when they need something that requires a verified unit — warranty status, replacement, or repair authorization — not for general usage/troubleshooting questions, which you can already answer from the manual without verification.',
+				'parameters'  => [
+					'type'       => 'object',
+					'properties' => [
+						'reason' => [ 'type' => 'string', 'description' => 'Why verification is needed' ],
+					],
+					'required' => [ 'reason' ],
+				],
+			];
 		}
 
 		if ( $has_model ) {
@@ -141,6 +167,10 @@ class AIAgent_Tools {
 					sanitize_text_field( $args['reason'] ?? '' ),
 					$context
 				);
+
+			case 'request_verification':
+				self::$requested_verification = true;
+				return 'Verification form is now shown to the customer. Briefly explain why (e.g. warranty check) — do not repeat the full form fields, the UI already shows them.';
 
 			default:
 				return '[Unknown tool: ' . esc_html( $name ) . ']';

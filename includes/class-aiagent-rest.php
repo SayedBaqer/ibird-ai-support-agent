@@ -292,8 +292,21 @@ class AIAgent_REST {
 		if ( $mode === 'product' ) {
 			$intent = AIAgent_Intent::classify( $message, $lang, $mode );
 
-			if ( $intent === 'support' ) {
-				// Switch conversation to support mode — but require verification before unlocking.
+			if ( $intent === 'support' && $selected_model !== null && $selected_model !== '' ) {
+				// A product is already selected — this is exactly the case the
+				// selected-product troubleshooting flow exists for. Do NOT force the
+				// verification gate here: stay in 'product' mode and let the tool loop
+				// try search_manual/search_common_knowledge first. Without this check,
+				// EVERY support-flavored message ("it's not turning on", "how do I fix
+				// it") was being routed straight to the verification form before ever
+				// reaching the tools that could actually answer it — the intent
+				// classifier had no idea a product was already selected. The AI can
+				// still call request_verification itself if the customer turns out to
+				// need something unit-specific (warranty/replacement/repair).
+
+			} elseif ( $intent === 'support' ) {
+				// No product selected — genuinely ambiguous "I bought X, it's broken"
+				// with nothing to go on yet. Gate on verification as before.
 				$wpdb->update(
 					"{$wpdb->prefix}aiagent_conversations",
 					[ 'mode' => 'support' ],
@@ -367,8 +380,11 @@ class AIAgent_REST {
 		$tool_calls_log = $loop['tool_calls_log'];
 
 		// Seed the semantic cache for Mode A replies so future near-identical questions
-		// skip the LLM. Only cache successful (non-fallback) product Q&A answers.
-		if ( $mode === 'product' && $final_reply !== '' && ! $loop['error'] ) {
+		// skip the LLM. Only cache successful (non-fallback) product Q&A answers — and
+		// never a reply that triggered request_verification: a cache HIT always returns
+		// needs_verification=false (see above), so caching one of these would replay the
+		// "let's verify" text to a later customer without ever showing them the form.
+		if ( $mode === 'product' && $final_reply !== '' && ! $loop['error'] && ! $loop['needs_verification'] ) {
 			AIAgent_RAG::semantic_cache_set( $message, $final_reply, $selected_model ?? '' );
 		}
 
@@ -381,7 +397,7 @@ class AIAgent_REST {
 			'reply'              => $final_reply,
 			'mode'               => $mode,
 			'escalated'          => $escalated,
-			'needs_verification' => false,
+			'needs_verification' => $loop['needs_verification'],
 			'lang'               => $lang,
 			'selected_model'     => $selected_model,
 		], 200 );
@@ -565,11 +581,12 @@ class AIAgent_REST {
 		$ticket_id = isset( $tm[1] ) ? (int) $tm[1] : 0;
 
 		return new WP_REST_Response( [
-			'reply'       => $reply,
-			'escalated'   => $escalated,
-			'ticket_id'   => $ticket_id,
-			'vision_desc' => $image_desc,
-			'lang'        => $lang,
+			'reply'              => $reply,
+			'escalated'          => $escalated,
+			'ticket_id'          => $ticket_id,
+			'vision_desc'        => $image_desc,
+			'lang'               => $lang,
+			'needs_verification' => $loop['needs_verification'],
 		], 200 );
 	}
 
@@ -1372,6 +1389,7 @@ class AIAgent_REST {
 	): array {
 		$system    = array_merge( self::build_system_prompt( $lang, $mode, $verified_model, $in_warranty, $selected_model ), $extra_system );
 		$has_model = ! empty( $verified_model ) || ! empty( $selected_model );
+		AIAgent_Tools::$requested_verification = false;
 
 		$final_reply    = '';
 		$tool_calls_log = []; // Accumulates {name, args, result} across ALL rounds — see below.
@@ -1473,7 +1491,13 @@ class AIAgent_REST {
 			$final_reply = AIAgent_I18n::setting_string( 'fallback_message', $lang );
 		}
 
-		return [ 'reply' => $final_reply, 'tool_calls_log' => $tool_calls_log, 'cost' => $cost, 'error' => $result['error'] ];
+		return [
+			'reply'              => $final_reply,
+			'tool_calls_log'     => $tool_calls_log,
+			'cost'               => $cost,
+			'error'              => $result['error'],
+			'needs_verification' => AIAgent_Tools::$requested_verification,
+		];
 	}
 
 	/**
@@ -1533,7 +1557,7 @@ class AIAgent_REST {
 		} elseif ( $selected_model !== null && $selected_model !== '' ) {
 			$base[] = 'CURRENT MODE: Product Q&A — customer is discussing "' . $selected_model . '" (NOT yet a verified owner).';
 			$base[] = 'You CAN help with general usage, setup, and troubleshooting for this product — call search_manual (model="' . $selected_model . '") and search_common_knowledge freely, the same way a sales rep would explain how something works before someone commits to a warranty claim.';
-			$base[] = 'You CANNOT state this specific unit\'s warranty status, promise a repair/replacement, or reveal any order-specific detail — those require ownership verification. If the customer needs one of those, ask them to verify ownership (model + serial + contact) rather than guessing or assuming.';
+			$base[] = 'You CANNOT state this specific unit\'s warranty status, promise a repair/replacement, or reveal any order-specific detail — those require ownership verification. If the customer needs one of those, briefly explain why, then call request_verification so they actually see the verification form — do not just tell them to "verify ownership" in text with no way to do it. Do not call it for ordinary usage/troubleshooting questions you can already answer from the manual.';
 			$base[] = 'Always search the knowledge base (search_taught_examples) and, for pricing/specs/availability questions, search_products too.';
 		} else {
 			$base[] = 'CURRENT MODE: Product Q&A (pre-sales, no product selected yet).';
