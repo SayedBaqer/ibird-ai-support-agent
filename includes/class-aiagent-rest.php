@@ -532,6 +532,25 @@ class AIAgent_REST {
 			return new WP_REST_Response( [ 'reply' => $reply, 'escalated' => false, 'vision_desc' => '', 'lang' => $lang ], 200 );
 		}
 
+		// ── Step 1.5: identify the product from the photo itself ──────────────
+		// Vision already recognizes what's shown — if nothing is selected yet, use
+		// that recognition to select a product the same way tapping "Ask about
+		// this" does, so search_manual can ground the reply in that model's manual
+		// without making the customer pick it manually first. A stricter threshold
+		// than the general product-search fallback (0.6 vs 0.55) since this drives
+		// an automatic selection, not just a suggestion the customer reacts to.
+		$identified_from_photo = false;
+		if ( empty( $selected_model ) && empty( $verified_model ) ) {
+			$identified_ids = AIAgent_RAG::search_products_semantic( $image_desc, 1, 0.6 );
+			if ( ! empty( $identified_ids ) ) {
+				$resolved = self::set_selected_product( $conversation, (int) $identified_ids[0] );
+				if ( $resolved !== '' ) {
+					$selected_model        = $resolved;
+					$identified_from_photo = true;
+				}
+			}
+		}
+
 		// ── Step 2: Search trained image examples for a similar photo ─────────
 		// Folded into the tool-loop as extra context rather than a hard branch —
 		// the AI still gets to call search_manual/search_taught_examples itself.
@@ -569,6 +588,9 @@ class AIAgent_REST {
 			$context_parts = array_map( fn( $m ) => "Q: {$m['question']}\nA: {$m['solution']}", $matched_training );
 			$extra_system[] = "Trained visual examples that may match this photo (reference, adapt to this case):\n" . implode( "\n\n", $context_parts );
 		}
+		if ( $identified_from_photo ) {
+			$extra_system[] = "The product \"{$selected_model}\" was identified from the photo itself (semantic match on the visual description), not chosen or confirmed by the customer. Open by confirming it (\"it looks like this is your {$selected_model} — is that right?\") before relying on it — do not state it as settled fact.";
+		}
 
 		$loop = self::run_agent_loop( $conv_id, $session_token, $lang, $mode, $verified_model, $in_warranty, $selected_model, $llm_messages, $extra_system );
 		$reply = $loop['reply'];
@@ -586,6 +608,7 @@ class AIAgent_REST {
 			'ticket_id'          => $ticket_id,
 			'vision_desc'        => $image_desc,
 			'lang'               => $lang,
+			'selected_model'     => $selected_model,
 			'needs_verification' => $loop['needs_verification'],
 		], 200 );
 	}

@@ -762,7 +762,7 @@ function sendPhoto(file){
     return fetch(REST+'/chat/attachment',{method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
       body:JSON.stringify({session_token:sess(),attachment_url:d.data.url,attachment_id:d.data.attachment_id||0,gemini_file_uri:d.data.gemini_file_uri||'',gemini_file_mime:d.data.gemini_file_mime||'image/jpeg',product_id:selectedProductId||undefined})}).then(function(r){return r.json();});
   })
-  .then(function(d){hideTyping();bubble('ai',d.reply);if(d.needs_verification)showVerify();})
+  .then(function(d){hideTyping();if(d.selected_model && !selectedProductName){selectedProductName=d.selected_model;renderSelBar();}bubble('ai',d.reply);if(d.needs_verification)showVerify();})
   .catch(function(e){hideTyping();bubble('ai',e.message||fb(),true);})
   .finally(function(){setBusy(false);URL.revokeObjectURL(url);});
 }
