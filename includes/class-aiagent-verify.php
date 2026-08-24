@@ -10,10 +10,15 @@ defined( 'ABSPATH' ) || exit;
 class AIAgent_Verify {
 
 	/**
-	 * Verify that the supplied name + phone match the registered owner of a serial number.
+	 * Verify that the supplied phone (and, if given, name) match the registered
+	 * owner of a serial number. Name is optional — serial + phone is the real
+	 * proof-of-possession check (a physical serial plus the registered contact
+	 * number); the istock path below has only ever actually checked phone, name
+	 * was collected but never validated, so this makes that official rather than
+	 * asking for a field that wasn't being used.
 	 *
 	 * @param  string $serial  Serial number the customer provided.
-	 * @param  string $name    Customer name the customer provided.
+	 * @param  string $name    Customer name the customer provided (optional).
 	 * @param  string $phone   Phone number the customer provided.
 	 * @return array {
 	 *   verified: bool,
@@ -25,7 +30,7 @@ class AIAgent_Verify {
 	 * }
 	 */
 	public static function verify_ownership( string $serial, string $name, string $phone ): array {
-		if ( $serial === '' || $name === '' || $phone === '' ) {
+		if ( $serial === '' || $phone === '' ) {
 			return [ 'verified' => false, 'reason' => 'incomplete_input' ];
 		}
 
@@ -162,7 +167,9 @@ class AIAgent_Verify {
 			return [ 'verified' => false, 'reason' => 'serial_not_found' ];
 		}
 
-		$name_ok  = self::names_match( $name, $row->owner_name );
+		// Name is optional — only enforced if the customer actually supplied one.
+		// Serial + phone is the real proof-of-possession check.
+		$name_ok  = ( $name === '' ) || self::names_match( $name, $row->owner_name );
 		$phone_ok = self::phones_match( $phone, $row->owner_phone );
 
 		if ( ! $name_ok || ! $phone_ok ) {
@@ -304,9 +311,9 @@ class AIAgent_Verify {
 	}
 
 	/**
-	 * Look up products owned by a customer via their name + phone.
-	 * Used for the "I don't know my serial" flow.
-	 * Returns sanitised list — no full serials to the client.
+	 * Look up products owned by a customer via their phone (name optional — used
+	 * only as a fallback if the phone alone doesn't match). Used for the "I don't
+	 * know my serial" flow. Returns sanitised list — no full serials to the client.
 	 * PII never leaves this method.
 	 */
 	public static function lookup_products_by_contact( string $name, string $phone ): array {
@@ -331,8 +338,9 @@ class AIAgent_Verify {
 			$last8, $last8
 		) );
 
-		if ( ! $customer ) {
-			// Try by name if phone didn't match.
+		// Fall back to name only if one was actually supplied — an empty $name
+		// here would otherwise become a bare "%%" LIKE, matching every customer.
+		if ( ! $customer && trim( $name ) !== '' ) {
 			$customer = $wpdb->get_row( $wpdb->prepare(
 				"SELECT id FROM {$p}isb_customers WHERE LOWER(display_name) LIKE %s LIMIT 1",
 				'%' . $wpdb->esc_like( mb_strtolower( trim( $name ) ) ) . '%'

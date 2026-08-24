@@ -40,7 +40,7 @@ class AIAgent_REST {
 				'session_token' => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
 				'model'         => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
 				'serial'        => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
-				'name'          => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
+				'name'          => [ 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ],
 				'phone'         => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
 			],
 		] );
@@ -167,7 +167,7 @@ class AIAgent_REST {
 			'permission_callback' => '__return_true',
 			'args'                => [
 				'session_token' => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
-				'name'          => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
+				'name'          => [ 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ],
 				'phone'         => [ 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
 			],
 		] );
@@ -411,7 +411,7 @@ class AIAgent_REST {
 		$session_token = $request->get_param( 'session_token' );
 		$model         = $request->get_param( 'model' );
 		$serial        = $request->get_param( 'serial' );
-		$name          = $request->get_param( 'name' );
+		$name          = (string) ( $request->get_param( 'name' ) ?? '' );
 		$phone         = $request->get_param( 'phone' );
 
 		$conversation = self::get_or_create_conversation( $session_token );
@@ -419,6 +419,7 @@ class AIAgent_REST {
 		$lang         = $conversation->language;
 
 		// ── Deterministic SQL verification — PII never leaves AIAgent_Verify ──
+		// Name is optional — serial + phone is the real proof-of-possession check.
 		$result = AIAgent_Verify::verify_ownership( $serial, $name, $phone );
 
 		if ( ! $result['verified'] ) {
@@ -1703,10 +1704,12 @@ class AIAgent_REST {
 
 	// ── Public: POST /support/lookup ─────────────────────────────────────────
 	public static function handle_support_lookup( WP_REST_Request $request ): WP_REST_Response {
-		$name  = $request->get_param( 'name' );
+		$name  = (string) ( $request->get_param( 'name' ) ?? '' );
 		$phone = $request->get_param( 'phone' );
 
-		if ( $name === '' || $phone === '' ) {
+		// Phone alone is enough — name is optional, only used as a fallback if
+		// the phone number itself doesn't match a customer record.
+		if ( $phone === '' ) {
 			return new WP_REST_Response( [ 'products' => [], 'found' => false ], 200 );
 		}
 

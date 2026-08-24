@@ -596,7 +596,7 @@ function showSerialLookup(parentForm, onSelect) {
 
   var title = document.createElement('div');
   title.style.cssText = 'font-size:12px;font-weight:700;color:#1a6b3c;margin-bottom:10px;';
-  title.textContent = t('Find your products by name & phone:', 'ابحث عن منتجاتك بالاسم والهاتف:');
+  title.textContent = t('Find your products by mobile number:', 'ابحث عن منتجاتك برقم الجوال:');
   panel.appendChild(title);
 
   function mkInp(id, placeholder) {
@@ -605,7 +605,6 @@ function showSerialLookup(parentForm, onSelect) {
     inp.style.cssText = 'display:block;width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;outline:none;-webkit-appearance:none;';
     return inp;
   }
-  var nameInp  = mkInp('lk-name',  t('Your full name','اسمك الكامل'));
   var phoneInp = mkInp('lk-phone', t('Phone: +973 XXXX XXXX','الهاتف: +973 XXXX XXXX'));
   var searchBtn = document.createElement('button');
   searchBtn.type = 'button';
@@ -615,14 +614,13 @@ function showSerialLookup(parentForm, onSelect) {
   resultArea.style.cssText = 'margin-top:10px;';
 
   searchBtn.addEventListener('click', function(){
-    var name  = nameInp.value.trim();
     var phone = phoneInp.value.trim();
-    if(!name||!phone){resultArea.innerHTML='<p style="color:#c62828;font-size:12px;">'+t('Please enter your name and phone.','يرجى إدخال الاسم والهاتف.')+'</p>';return;}
+    if(!phone){resultArea.innerHTML='<p style="color:#c62828;font-size:12px;">'+t('Please enter your mobile number.','يرجى إدخال رقم الجوال.')+'</p>';return;}
     searchBtn.disabled=true; searchBtn.textContent=t('Searching…','جاري البحث…');
     resultArea.innerHTML='';
     fetch(REST+'/support/lookup',{
       method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
-      body:JSON.stringify({session_token:sess(),name:name,phone:phone})
+      body:JSON.stringify({session_token:sess(),phone:phone})
     })
     .then(function(r){return r.json();})
     .then(function(d){
@@ -648,7 +646,6 @@ function showSerialLookup(parentForm, onSelect) {
     .catch(function(){searchBtn.disabled=false;searchBtn.textContent=t('🔍 Find My Products','🔍 ابحث عن منتجاتي');resultArea.innerHTML='<p style="color:#c62828;font-size:12px;">'+t('Search failed. Please try again.','فشل البحث. يرجى المحاولة مرة أخرى.')+'</p>';});
   });
 
-  panel.appendChild(nameInp);
   panel.appendChild(phoneInp);
   panel.appendChild(searchBtn);
   panel.appendChild(resultArea);
@@ -678,13 +675,12 @@ function showVerify() {
   sub.addEventListener('click',function(){
     var model=document.getElementById('vf-model').value.trim();
     var serial=document.getElementById('vf-serial').value.trim();
-    var name=document.getElementById('vf-name').value.trim();
     var phone=document.getElementById('vf-phone').value.trim();
-    if(!model||!serial||!name||!phone){status.textContent=t('Please fill in all fields.','يرجى تعبئة جميع الحقول.');return;}
+    if(!model||!serial||!phone){status.textContent=t('Please fill in all fields.','يرجى تعبئة جميع الحقول.');return;}
     sub.disabled=true; status.textContent=t('Verifying…','جارٍ التحقق…');
     fetch(REST+'/support/verify',{
       method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
-      body:JSON.stringify({session_token:sess(),model:model,serial:serial,name:name,phone:phone}),
+      body:JSON.stringify({session_token:sess(),model:model,serial:serial,phone:phone}),
     })
     .then(function(r){return r.json();})
     .then(function(d){form.remove();vMode=false;if(d.verified){bubble('ai',d.reply);}else{bubble('ai',d.reply||t('Could not verify. Please check your details.','تعذر التحقق. يرجى مراجعة البيانات.'),true);escPrompt();}})
@@ -700,7 +696,7 @@ function showVerify() {
   // "Find my serial" link.
   var lookupLink = document.createElement('div');
   lookupLink.style.cssText = 'font-size:12px;color:#1a6b3c;text-align:center;margin-bottom:10px;cursor:pointer;text-decoration:underline;';
-  lookupLink.textContent = t('I don\'t know my serial — find it by my name & phone','لا أعرف الرقم التسلسلي — ابحث بالاسم والهاتف');
+  lookupLink.textContent = t('I don\'t know my serial — find it by my mobile number','لا أعرف الرقم التسلسلي — ابحث برقم الجوال');
   lookupLink.addEventListener('click', function(){
     lookupLink.style.display = 'none';
     showSerialLookup(form, function(selectedModel, selectedSerialHint){
@@ -713,7 +709,6 @@ function showVerify() {
   });
   form.appendChild(lookupLink);
 
-  form.appendChild(field('vf-name',  t('Your Name','اسمك'),'text',t('As on invoice','كما في الفاتورة')));
   form.appendChild(field('vf-phone', t('Phone Number','رقم الجوال'),'tel','+973 XXXX XXXX'));
   form.appendChild(status); form.appendChild(actions);
   $msgs.appendChild(form); scrollEnd();
