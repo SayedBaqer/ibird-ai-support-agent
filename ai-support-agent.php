@@ -3,7 +3,7 @@
  * Plugin Name: AI Support Agent
  * Plugin URI:  https://ibird.bh
  * Description: Self-improving AI support agent for WooCommerce — bilingual EN/AR, RAG knowledge base, Mode A product Q&A + Mode B verified support.
- * Version:     1.10.1
+ * Version:     1.10.2
  * Author:      iBird
  * Text Domain: ai-support-agent
  * Domain Path: /languages
@@ -14,7 +14,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AIAGENT_VERSION',    '1.10.1' );
+define( 'AIAGENT_VERSION',    '1.10.2' );
 define( 'AIAGENT_FILE',       __FILE__ );
 define( 'AIAGENT_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'AIAGENT_URL',        plugin_dir_url( __FILE__ ) );

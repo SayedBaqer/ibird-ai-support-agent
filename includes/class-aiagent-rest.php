@@ -1374,7 +1374,7 @@ class AIAgent_REST {
 		$has_model = ! empty( $verified_model ) || ! empty( $selected_model );
 
 		$final_reply    = '';
-		$tool_calls_log = null;
+		$tool_calls_log = []; // Accumulates {name, args, result} across ALL rounds — see below.
 		$cost           = 1;
 		// Customer-facing replies always reason before answering — same as the
 		// admin training chat already does. This is what actually fixes "picks the
@@ -1404,7 +1404,6 @@ class AIAgent_REST {
 
 			if ( ! empty( $result['tool_calls'] ) ) {
 				$cost++;
-				$tool_calls_log = $result['tool_calls'];
 
 				$llm_messages[] = [
 					'role'  => 'model',
@@ -1422,6 +1421,14 @@ class AIAgent_REST {
 						'verified_model'  => $verified_model,
 						'selected_model'  => $selected_model,
 					] );
+					// Log the call AND what it actually found — not just the call itself.
+					// This is what lets the admin UI show "why did the AI say this" instead
+					// of a name-only trace that drops the very content that grounded the reply.
+					$tool_calls_log[] = [
+						'name'   => $tc['name'],
+						'args'   => $tc['args'] ?? [],
+						'result' => $tool_output,
+					];
 					$tool_result_parts[] = [
 						'functionResponse' => [
 							'name'     => $tc['name'],

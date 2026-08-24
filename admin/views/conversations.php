@@ -256,6 +256,7 @@ function aaBuildMsg(m, prevCustMsg, convId){
   var roleLabel=m.role==='customer'?'Customer':(m.role==='human'?'Admin':'AI');
   meta.innerHTML='<span style="font-weight:700;">'+esc(roleLabel)+'</span><span>'+esc((m.created_at||'').slice(11,16))+'</span>';
   wrap.appendChild(meta);
+  if(m.role==='ai') aaAppendSources(wrap, m.tool_calls);
   if(m.role==='ai'){
     var rateRow=document.createElement('div'); rateRow.className='aa-rate-row';
     rateRow.innerHTML='<span style="font-size:10px;color:#94a3b8;">Rate:</span>'
@@ -396,6 +397,39 @@ function aaSubmitRate(id){
       +(corr?'<div style="font-size:11px;margin-top:4px;background:#fff9e6;border-left:3px solid #ffc107;padding:4px 8px;border-radius:0 5px 5px 0;">'+esc(corr)+'</div>':'');
     delete aaPending[id];
   }).catch(function(){});
+}
+
+/* ── Sources: which knowledge actually backed this reply ─────────── */
+/* tool_calls is stored as [{name,args,result}, ...] JSON — the same tool
+   results the AI itself used to draft its answer, so this shows exactly
+   what grounded a reply instead of leaving that to guesswork. */
+function aaAppendSources(wrap, toolCallsJson){
+  if(!toolCallsJson) return;
+  var calls;
+  try{ calls = JSON.parse(toolCallsJson); }catch(e){ return; }
+  if(!calls || !calls.length || !calls[0] || typeof calls[0]!=='object' || !('name' in calls[0])) return;
+
+  var srcWrap=document.createElement('div'); srcWrap.style.cssText='margin-top:4px;';
+  var srcBtn=document.createElement('button'); srcBtn.type='button';
+  srcBtn.textContent='🔍 Sources ('+calls.length+')';
+  srcBtn.style.cssText='background:none;border:1px solid #e2e8f0;border-radius:50px;padding:3px 10px;font-size:10px;font-weight:700;color:#64748b;cursor:pointer;';
+
+  var srcBody=document.createElement('div');
+  srcBody.style.cssText='display:none;margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:11px;color:#475569;max-width:420px;';
+  srcBody.innerHTML=calls.map(function(c){
+    var args=c.args||{};
+    var argsStr=Object.keys(args).map(function(k){return k+'="'+args[k]+'"';}).join(', ');
+    var result=(c.result||'').toString();
+    var preview=result.slice(0,350);
+    return '<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">'
+      +'<div style="font-weight:700;color:#1a6b3c;">'+esc(c.name||'')+'('+esc(argsStr)+')</div>'
+      +'<div style="white-space:pre-wrap;margin-top:3px;color:#64748b;">'+esc(preview)+(result.length>350?'…':'')+'</div>'
+      +'</div>';
+  }).join('');
+
+  srcBtn.addEventListener('click',function(){srcBody.style.display=srcBody.style.display==='none'?'block':'none';});
+  srcWrap.appendChild(srcBtn); srcWrap.appendChild(srcBody);
+  wrap.appendChild(srcWrap);
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
