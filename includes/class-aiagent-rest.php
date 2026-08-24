@@ -1481,7 +1481,9 @@ class AIAgent_REST {
 			// Context usage rules
 			'HOW TO USE RETRIEVED CONTEXT: When tool results contain knowledge base examples (Q&A pairs) or manual sections, use them as a REFERENCE to ground your answer — not as a script to copy word-for-word. Adapt the information to the customer\'s specific question and phrasing. It is fine to rephrase, expand, or condense.',
 			'If retrieved context partially answers the question, answer what you can and acknowledge what you cannot.',
-			'If no relevant knowledge is found by tools, say so honestly and offer to escalate rather than guessing.',
+			'SEARCH PERSISTENCE: customers write shorthand, typos, and merged words — e.g. "22egg" likely means a model with a 22-egg capacity. If a search tool (search_products/search_manual/search_taught_examples/search_common_knowledge) returns nothing, do not immediately tell the customer nothing was found or ask a generic clarifying question — try again with a normalized or rephrased query first (split merged words/numbers, fix likely typos, try a synonym or the underlying category). Only ask the customer to clarify after a genuine second attempt still finds nothing.',
+			'ESCALATION IS A LAST RESORT, NOT A FIRST RESPONSE: only call escalate_to_human when (a) the customer explicitly asks for a person/human/agent, or (b) you have already made a genuine search attempt (including a rephrase) for a real support issue and it truly cannot be resolved from what the tools return. Never escalate just because a first search came back empty, or as a reflex for an ordinary question — search again or ask ONE clarifying question instead. If a ticket for this conversation is already open, do not escalate again; tell the customer a specialist is already on it.',
+			'If, after genuinely trying, you still cannot help, say so honestly and ASK the customer whether they\'d like you to connect them to a specialist — only call escalate_to_human after they agree (or already asked for a human up front).',
 		];
 
 		if ( $mode === 'support' && $verified_model !== null ) {

@@ -154,21 +154,22 @@ class AIAgent_Tools {
 			return 'No query provided.';
 		}
 
-		$ids = wc_get_products( [
-			'status'  => 'publish',
-			'limit'   => 5,
-			'return'  => 'ids',
-			's'       => $query,
-		] );
+		$ids = self::do_product_search( $query );
 
-		// Fallback to WP_Query if WC search returns nothing.
+		// WooCommerce/WP search is a literal substring match, so shorthand like
+		// "22egg" (meant as "22 egg [incubator]") returns nothing even when the
+		// product clearly exists. Retry once with number/letter boundaries split
+		// apart before giving up — cheap, and fixes the common glued-word case.
 		if ( empty( $ids ) ) {
-			$qr  = new WP_Query( [ 'post_type' => 'product', 'post_status' => 'publish', 's' => $query, 'posts_per_page' => 5, 'fields' => 'ids' ] );
-			$ids = $qr->posts;
+			$normalized = preg_replace( '/(?<=[0-9])(?=[a-zA-Z])|(?<=[a-zA-Z])(?=[0-9])/u', ' ', $query );
+			$normalized = trim( preg_replace( '/\s+/', ' ', $normalized ) );
+			if ( $normalized !== '' && $normalized !== $query ) {
+				$ids = self::do_product_search( $normalized );
+			}
 		}
 
 		if ( empty( $ids ) ) {
-			return 'No matching products found in the catalogue.';
+			return 'No matching products found for "' . $query . '". If this looks like shorthand, a typo, or a merged word/number, try rephrasing the query (e.g. split numbers from words) before telling the customer nothing was found.';
 		}
 
 		$lines = [];
@@ -209,6 +210,26 @@ class AIAgent_Tools {
 		}
 
 		return $lines ? implode( "\n\n---\n\n", $lines ) : 'No product details available.';
+	}
+
+	/**
+	 * Run the WooCommerce product search (with a WP_Query fallback) for one query
+	 * string. Extracted so search_products() can retry with a normalized query.
+	 */
+	private static function do_product_search( string $query ): array {
+		$ids = wc_get_products( [
+			'status'  => 'publish',
+			'limit'   => 5,
+			'return'  => 'ids',
+			's'       => $query,
+		] );
+
+		if ( empty( $ids ) ) {
+			$qr  = new WP_Query( [ 'post_type' => 'product', 'post_status' => 'publish', 's' => $query, 'posts_per_page' => 5, 'fields' => 'ids' ] );
+			$ids = $qr->posts;
+		}
+
+		return $ids;
 	}
 
 	// ── Tool: search_manual (verified support, or an unverified selected product) ──
@@ -294,6 +315,20 @@ class AIAgent_Tools {
 
 		if ( ! $conversation_id ) {
 			return 'Escalation failed: no conversation ID.';
+		}
+
+		// Idempotency guard: a conversation should only ever have one open ticket.
+		// Without this, every re-escalation (AI calling the tool again on a later
+		// message, or a customer double-tapping "Talk to a person") inserted a brand
+		// new ticket AND re-sent the admin notification — "infinite" duplicate tickets.
+		$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}aiagent_tickets
+			WHERE conversation_id = %d AND status IN ('open','claimed')
+			ORDER BY created_at DESC LIMIT 1",
+			$conversation_id
+		) );
+		if ( $existing_id ) {
+			return "Escalation ticket #{$existing_id} is already open for this conversation. A specialist will follow up shortly — do not create another ticket.";
 		}
 
 		$wpdb->insert(

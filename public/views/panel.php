@@ -730,6 +730,7 @@ function escPrompt(){
 
 /* ── Escalate ────────────────────────────────────────────────────── */
 function escalate(){
+  if(busy) return; // guard against double-click/double-tap creating duplicate requests
   setBusy(true);
   fetch(REST+'/escalate',{method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
     body:JSON.stringify({session_token:sess(),reason:t('Customer requested human support','طلب العميل دعم بشري')})})
@@ -768,7 +769,7 @@ function sendPhoto(file){
 
 /* ── Busy state ──────────────────────────────────────────────────── */
 function setBusy(b){
-  busy=b;$inp.disabled=b;$send.disabled=b;$photoBtn.disabled=b;
+  busy=b;$inp.disabled=b;$send.disabled=b;$photoBtn.disabled=b;$escBtn.disabled=b;
   if(b){showTyping();}else{hideTyping();$inp.focus();}
 }
 
