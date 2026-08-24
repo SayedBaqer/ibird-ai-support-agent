@@ -186,6 +186,22 @@ class AIAgent_DB {
 			KEY model (model)
 		) $charset;" );
 
+		// product_embeddings — semantic index over the WooCommerce catalogue, same
+		// pattern as manual_chunks/taught_examples (embed once, cosine-search later).
+		// WordPress/WooCommerce's own product search is a literal AND-of-words
+		// substring match, so natural customer phrasing ("small incubator" when the
+		// product is titled just "Incubator", or "22egg" for a 22-egg model) often
+		// finds nothing even when the product obviously exists. This lets
+		// search_products fall back to real semantic matching. content_hash detects
+		// when a product changed so re-embedding only happens when needed.
+		dbDelta( "CREATE TABLE {$wpdb->prefix}aiagent_product_embeddings (
+			product_id   BIGINT UNSIGNED NOT NULL,
+			content_hash CHAR(32)     NOT NULL,
+			embedding    LONGBLOB     DEFAULT NULL,
+			updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (product_id)
+		) $charset;" );
+
 		// Seed default policy rules if table is empty.
 		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}aiagent_policy_rules" );
 		if ( $count === 0 ) {

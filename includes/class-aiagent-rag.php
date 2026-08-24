@@ -314,6 +314,151 @@ class AIAgent_RAG {
 		return $done;
 	}
 
+	// ── Product catalogue semantic index ──────────────────────────────────────
+	// WordPress/WooCommerce's built-in product search is a literal AND-of-words
+	// substring match — natural customer phrasing routinely finds nothing even
+	// when the product obviously exists ("small incubator" when the listing is
+	// just "Incubator"; "22egg" for a 22-egg-capacity model). This mirrors the
+	// same embed-once/cosine-search pattern already used for manuals and taught
+	// examples, applied to the catalogue instead.
+
+	/**
+	 * Build the text a product is embedded from: name + short description +
+	 * categories + attributes — the same fields search_products already surfaces
+	 * to the LLM, so semantic match and literal display stay consistent.
+	 */
+	private static function product_embed_text( WC_Product $product ): string {
+		$parts = [ $product->get_name() ];
+
+		$desc = $product->get_short_description();
+		if ( $desc === '' ) {
+			$desc = $product->get_description();
+		}
+		if ( $desc !== '' ) {
+			$parts[] = wp_trim_words( wp_strip_all_tags( $desc ), 60 );
+		}
+
+		$cats = wp_get_post_terms( $product->get_id(), 'product_cat', [ 'fields' => 'names' ] );
+		if ( ! empty( $cats ) && ! is_wp_error( $cats ) ) {
+			$parts[] = implode( ', ', $cats );
+		}
+
+		foreach ( $product->get_attributes() as $attr ) {
+			if ( $attr instanceof WC_Product_Attribute ) {
+				$parts[] = implode( ', ', $attr->get_options() );
+			}
+		}
+
+		return implode( "\n", array_filter( $parts ) );
+	}
+
+	/**
+	 * Background job: (re)embed published products whose catalogue text changed
+	 * or has never been embedded. Reschedules itself until fully caught up, same
+	 * pattern as embed_pending_chunks/embed_pending_examples.
+	 */
+	public static function embed_pending_products( int $batch = 25 ): int {
+		global $wpdb;
+
+		$ids = wc_get_products( [ 'status' => 'publish', 'limit' => -1, 'return' => 'ids' ] );
+		if ( empty( $ids ) ) {
+			return 0;
+		}
+
+		$existing = $wpdb->get_results(
+			"SELECT product_id, content_hash FROM {$wpdb->prefix}aiagent_product_embeddings",
+			OBJECT_K
+		);
+
+		$done = 0;
+		foreach ( $ids as $id ) {
+			if ( $done >= $batch ) {
+				break;
+			}
+			$product = wc_get_product( $id );
+			if ( ! $product ) {
+				continue;
+			}
+
+			$text = self::product_embed_text( $product );
+			$hash = md5( $text );
+
+			$row = $existing[ $id ] ?? null;
+			if ( $row && $row->content_hash === $hash ) {
+				continue; // Already embedded and unchanged.
+			}
+
+			$emb = AIAgent_LLM::embed( $text );
+			if ( empty( $emb ) ) {
+				continue;
+			}
+
+			$wpdb->replace(
+				"{$wpdb->prefix}aiagent_product_embeddings",
+				[ 'product_id' => $id, 'content_hash' => $hash, 'embedding' => wp_json_encode( $emb ) ],
+				[ '%d', '%s', '%s' ]
+			);
+			$done++;
+		}
+
+		// Drop embeddings for products that no longer exist/aren't published.
+		$id_list = implode( ',', array_map( 'absint', $ids ) );
+		if ( $id_list !== '' ) {
+			$wpdb->query( "DELETE FROM {$wpdb->prefix}aiagent_product_embeddings WHERE product_id NOT IN ({$id_list})" );
+		}
+
+		// Reschedule if this batch found anything to do — either more products
+		// remain, or this pass just did work and a changed catalogue might have
+		// more waiting right behind it.
+		if ( $done >= $batch ) {
+			wp_schedule_single_event( time() + 5, 'aiagent_embed_products_cron' );
+		}
+
+		return $done;
+	}
+
+	/**
+	 * Drop one product's cached embedding so the next batch re-embeds it —
+	 * called when a product is saved/updated.
+	 */
+	public static function invalidate_product_embedding( int $product_id ): void {
+		global $wpdb;
+		$wpdb->delete( "{$wpdb->prefix}aiagent_product_embeddings", [ 'product_id' => $product_id ], [ '%d' ] );
+	}
+
+	/**
+	 * Semantic fallback for product search: embed the customer's query and
+	 * cosine-match against the catalogue index. Returns product IDs ordered by
+	 * relevance (highest first).
+	 */
+	public static function search_products_semantic( string $query, int $limit = 5, float $threshold = 0.55 ): array {
+		global $wpdb;
+
+		$q_emb = AIAgent_LLM::embed( $query );
+		if ( empty( $q_emb ) ) {
+			return [];
+		}
+
+		$rows = $wpdb->get_results(
+			"SELECT product_id, embedding FROM {$wpdb->prefix}aiagent_product_embeddings WHERE embedding IS NOT NULL"
+		);
+
+		$scored = [];
+		foreach ( $rows as $row ) {
+			$emb = json_decode( $row->embedding, true );
+			if ( ! is_array( $emb ) ) {
+				continue;
+			}
+			$score = self::cosine_similarity( $q_emb, $emb );
+			if ( $score >= $threshold ) {
+				$scored[] = [ 'id' => (int) $row->product_id, 'score' => $score ];
+			}
+		}
+
+		usort( $scored, fn( $a, $b ) => $b['score'] <=> $a['score'] );
+		return array_column( array_slice( $scored, 0, $limit ), 'id' );
+	}
+
 	/**
 	 * Embed and store a single manual chunk (original method — kept for compatibility).
 	 */

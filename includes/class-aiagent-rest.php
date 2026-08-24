@@ -1376,8 +1376,14 @@ class AIAgent_REST {
 		$final_reply    = '';
 		$tool_calls_log = null;
 		$cost           = 1;
-		$options        = []; // May receive cache_name after a search_manual tool call.
-		$result         = [ 'error' => false, 'reply' => '', 'tool_calls' => null, 'grounding' => null ];
+		// Customer-facing replies always reason before answering — same as the
+		// admin training chat already does. This is what actually fixes "picks the
+		// wrong search term and gives up" style failures: the model gets a real
+		// reasoning pass to decide things like "the customer means a smaller
+		// capacity, try 'incubator' without 'small'" before it drafts a reply.
+		// Budget stays admin-tunable via Settings; only the on/off is fixed here.
+		$options = [ 'thinking' => true, 'thinking_budget' => (int) ( aiagent_settings()['thinking_budget'] ?? 2048 ) ];
+		$result  = [ 'error' => false, 'reply' => '', 'tool_calls' => null, 'grounding' => null ];
 
 		// 5 rounds, not 3 — a genuine multi-step lookup (e.g. search_products fails,
 		// retry search_taught_examples, then search_common_knowledge) can legitimately

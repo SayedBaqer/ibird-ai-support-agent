@@ -3,7 +3,7 @@
  * Plugin Name: AI Support Agent
  * Plugin URI:  https://ibird.bh
  * Description: Self-improving AI support agent for WooCommerce — bilingual EN/AR, RAG knowledge base, Mode A product Q&A + Mode B verified support.
- * Version:     1.9.2
+ * Version:     1.10.0
  * Author:      iBird
  * Text Domain: ai-support-agent
  * Domain Path: /languages
@@ -14,11 +14,11 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AIAGENT_VERSION',    '1.9.2' );
+define( 'AIAGENT_VERSION',    '1.10.0' );
 define( 'AIAGENT_FILE',       __FILE__ );
 define( 'AIAGENT_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'AIAGENT_URL',        plugin_dir_url( __FILE__ ) );
-define( 'AIAGENT_DB_VER',     '8' );
+define( 'AIAGENT_DB_VER',     '9' );
 define( 'AIAGENT_GITHUB_REPO', 'SayedBaqer/ibird-ai-support-agent' );
 
 // ── Autoload includes ────────────────────────────────────────────────────────
@@ -83,8 +83,8 @@ function aiagent_default_settings() {
 		'cerebras_model'      => 'llama-3.3-70b',
 		// Gemini advanced features (Gemini-only; ignored by Groq/Cerebras fallback).
 		'enable_search_grounding' => false,
-		'enable_thinking'         => false,
-		'thinking_budget'         => 1024,
+		'enable_thinking'         => true,
+		'thinking_budget'         => 2048,
 		// GitHub auto-update (private repo PAT with contents:read scope).
 		'github_token'            => '',
 		// Escalation notifications.
@@ -129,6 +129,9 @@ function aiagent_boot() {
 	if ( get_option( 'aiagent_db_version' ) !== AIAGENT_DB_VER ) {
 		AIAgent_DB::install();
 		update_option( 'aiagent_db_version', AIAGENT_DB_VER );
+		// New product_embeddings table — index the existing catalogue right away
+		// instead of waiting for products to be individually re-saved.
+		wp_schedule_single_event( time() + 10, 'aiagent_embed_products_cron' );
 	}
 
 	load_plugin_textdomain( 'ai-support-agent', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
@@ -204,6 +207,29 @@ function aiagent_run_embed_examples(): void {
 	if ( class_exists( 'AIAgent_RAG' ) ) {
 		AIAgent_RAG::embed_pending_examples( 30 );
 	}
+}
+
+// ── Product catalogue semantic index ─────────────────────────────────────────
+// Keeps a searchable embedding for every published product so search_products
+// can fall back to real semantic matching when WooCommerce's literal keyword
+// search finds nothing (see AIAgent_RAG::search_products_semantic).
+
+add_action( 'aiagent_embed_products_cron', 'aiagent_run_embed_products' );
+function aiagent_run_embed_products(): void {
+	@set_time_limit( 120 );
+	if ( class_exists( 'AIAgent_RAG' ) ) {
+		AIAgent_RAG::embed_pending_products( 25 );
+	}
+}
+
+// Re-index a product the moment it's created/edited, instead of waiting for a
+// customer to search for it against a stale/missing embedding.
+add_action( 'woocommerce_update_product', 'aiagent_invalidate_product_embedding' );
+add_action( 'woocommerce_new_product',    'aiagent_invalidate_product_embedding' );
+function aiagent_invalidate_product_embedding( $product_id ): void {
+	if ( ! class_exists( 'AIAgent_RAG' ) ) return;
+	AIAgent_RAG::invalidate_product_embedding( (int) $product_id );
+	wp_schedule_single_event( time() + 5, 'aiagent_embed_products_cron' );
 }
 
 // ── GitHub updater AJAX handlers ─────────────────────────────────────────────

@@ -185,8 +185,18 @@ class AIAgent_Tools {
 			$ids = array_keys( $merged );
 		}
 
+		// Last resort: real semantic search. Literal search can only ever find an
+		// exact substring — it has no notion that "small" and "mini/compact", or
+		// "22egg" and "22-egg capacity", mean the same thing. This embeds the
+		// query and cosine-matches it against a precomputed index of the catalogue
+		// (AIAgent_RAG::embed_pending_products), so it finds the right product by
+		// meaning even when no literal word matches at all.
 		if ( empty( $ids ) ) {
-			return 'No matching products found for "' . $query . '" even after retrying with a normalized query and each individual word. Ask the customer a clarifying question (e.g. size/capacity/budget/category) instead of saying nothing is available — do not conclude the store lacks this product from one failed search.';
+			$ids = AIAgent_RAG::search_products_semantic( $query );
+		}
+
+		if ( empty( $ids ) ) {
+			return 'No matching products found for "' . $query . '" after a literal search, a normalized retry, a per-word search, and a semantic search. Ask the customer a clarifying question (e.g. size/capacity/budget/category) instead of saying nothing is available — do not conclude the store lacks this product from one failed search.';
 		}
 
 		$lines = [];
