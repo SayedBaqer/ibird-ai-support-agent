@@ -154,7 +154,13 @@ class AIAgent_Tools {
 			return 'No query provided.';
 		}
 
-		$ids = self::do_product_search( $query );
+		// Track which tier actually found the match — an exact/normalized hit means
+		// the customer's own words matched; a per-word or semantic match means the
+		// system inferred the product, which is worth confirming with the customer
+		// rather than stating as settled fact (same principle production support
+		// agents use: gate confidence on retrieval strength, not just "found vs not").
+		$tier = 'exact';
+		$ids  = self::do_product_search( $query );
 
 		// WooCommerce/WP search is a literal substring match, so shorthand like
 		// "22egg" (meant as "22 egg [incubator]") returns nothing even when the
@@ -164,7 +170,8 @@ class AIAgent_Tools {
 			$normalized = preg_replace( '/(?<=[0-9])(?=[a-zA-Z])|(?<=[a-zA-Z])(?=[0-9])/u', ' ', $query );
 			$normalized = trim( preg_replace( '/\s+/', ' ', $normalized ) );
 			if ( $normalized !== '' && $normalized !== $query ) {
-				$ids = self::do_product_search( $normalized );
+				$ids  = self::do_product_search( $normalized );
+				$tier = 'normalized';
 			}
 		}
 
@@ -182,7 +189,8 @@ class AIAgent_Tools {
 					if ( count( $merged ) >= 5 ) break 2;
 				}
 			}
-			$ids = array_keys( $merged );
+			$ids  = array_keys( $merged );
+			$tier = 'partial';
 		}
 
 		// Last resort: real semantic search. Literal search can only ever find an
@@ -192,7 +200,8 @@ class AIAgent_Tools {
 		// (AIAgent_RAG::embed_pending_products), so it finds the right product by
 		// meaning even when no literal word matches at all.
 		if ( empty( $ids ) ) {
-			$ids = AIAgent_RAG::search_products_semantic( $query );
+			$ids  = AIAgent_RAG::search_products_semantic( $query );
+			$tier = 'semantic';
 		}
 
 		if ( empty( $ids ) ) {
@@ -236,7 +245,21 @@ class AIAgent_Tools {
 			] ) );
 		}
 
-		return $lines ? implode( "\n\n---\n\n", $lines ) : 'No product details available.';
+		if ( ! $lines ) {
+			return 'No product details available.';
+		}
+
+		$body = implode( "\n\n---\n\n", $lines );
+
+		// Confidence note — only for tiers where the match was inferred rather
+		// than typed by the customer. Exact/normalized matches need no caveat.
+		if ( $tier === 'partial' ) {
+			$body .= "\n\n[Note: matched by some of the words in the query, not all of them — confirm with the customer this is the right product before presenting it as a firm match.]";
+		} elseif ( $tier === 'semantic' ) {
+			$body .= "\n\n[Note: matched by meaning/similarity, not by any literal keyword in the query — this is a best guess. Present it as a suggestion (\"this might be what you're looking for\") and confirm, rather than stating it as the definite match.]";
+		}
+
+		return $body;
 	}
 
 	/**
@@ -289,12 +312,13 @@ class AIAgent_Tools {
 		$results = AIAgent_RAG::search_manual( $question, $model, 4 );
 
 		if ( empty( $results ) ) {
-			return 'No relevant manual sections found for model "' . $model . '".';
+			return 'No relevant manual sections found for model "' . $model . '". Try search_common_knowledge for general troubleshooting that isn\'t model-specific before telling the customer nothing was found.';
 		}
 
 		$parts = [];
 		foreach ( $results as $r ) {
-			$parts[] = ( $r['section'] ? "## {$r['section']}\n" : '' ) . $r['chunk'];
+			$score_pct = round( $r['score'] * 100 );
+			$parts[] = ( $r['section'] ? "## {$r['section']}\n" : '' ) . $r['chunk'] . "\n[relevance: {$score_pct}%]";
 		}
 
 		return implode( "\n\n---\n\n", $parts );
