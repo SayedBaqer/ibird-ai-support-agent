@@ -216,6 +216,15 @@ body{
 }
 .privacy-bar a{color:#92400e;font-weight:600;}
 .privacy-bar-x{background:none;border:none;color:#92400e;cursor:pointer;font-size:15px;line-height:1;padding:0 2px;flex-shrink:0}
+
+/* ── Selected-product chip ────────────────────────────────────────── */
+.sel-bar{
+  flex-shrink:0;display:none;align-items:center;justify-content:space-between;gap:8px;
+  background:#f0fdf4;border-bottom:1px solid #bbf7d0;
+  padding:7px 14px;font-size:12px;color:#145530;
+}
+.sel-bar strong{font-weight:700}
+.sel-bar-change{background:none;border:none;color:#1a6b3c;cursor:pointer;font-size:11px;font-weight:700;text-decoration:underline;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body>
@@ -235,6 +244,12 @@ body{
   style="<?php echo ( isset( $_COOKIE['aa_privacy_ok'] ) ? 'display:none' : '' ); ?>">
   <span>🔒 This chat is powered by Google AI (Gemini). By chatting you agree to our use of AI for support. No personal data is shared with AI.</span>
   <button class="privacy-bar-x" id="privacy-ok" aria-label="Dismiss">✕</button>
+</div>
+
+<!-- Selected-product context bar -->
+<div class="sel-bar" id="sel-bar" role="note">
+  <span id="sel-bar-text"></span>
+  <button class="sel-bar-change" id="sel-bar-change" type="button"></button>
 </div>
 
 <!-- Messages -->
@@ -296,6 +311,8 @@ var pendingLang  = null;  // candidate switch language
 var pendingCount = 0;     // consecutive messages in pendingLang
 var busy  = false;
 var vMode = false;
+var selectedProductId   = null;
+var selectedProductName = null;
 
 /* ── Session token ────────────────────────────────────────────────── */
 function sess() {
@@ -454,7 +471,7 @@ function prodGrid(prods,total,catId) {
     var nm=document.createElement('div');   nm.className='prod-name'; nm.textContent=p.name;
     var pr=document.createElement('div');   pr.className='prod-price'; pr.textContent=p.price||'';
     var ab=document.createElement('button');ab.type='button'; ab.className='prod-ask'; ab.textContent=t('Ask about this','اسأل عن هذا');
-    ab.addEventListener('click',function(){grid.remove();$inp.value=t('Tell me about ','أخبرني عن ')+p.name;doSend();});
+    ab.addEventListener('click',function(){grid.remove();selectProduct(p);$inp.value=t('Tell me about ','أخبرني عن ')+p.name;doSend();});
     info.appendChild(nm); info.appendChild(pr); info.appendChild(ab);
     card.appendChild(info); grid.appendChild(card);
   });
@@ -500,6 +517,38 @@ function showProductCard(p) {
   scrollEnd();
 }
 
+/* ── Selected-product context ────────────────────────────────────── */
+/* Persists which product the customer is discussing so manual-grounded
+   troubleshooting/how-to can use it before ownership is ever verified —
+   mirrors a human rep confirming "so this is about the X, right?" */
+function renderSelBar() {
+  var bar = document.getElementById('sel-bar');
+  var txt = document.getElementById('sel-bar-text');
+  var chg = document.getElementById('sel-bar-change');
+  if (!selectedProductName) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  txt.innerHTML = t('Discussing: ','بخصوص: ') + '<strong>' + htmlEnc(selectedProductName) + '</strong>';
+  chg.textContent = t('Change','تغيير');
+}
+document.getElementById('sel-bar-change').addEventListener('click', function(){
+  selectedProductId = null; selectedProductName = null;
+  renderSelBar();
+  bubble('cust', t('Browse Products','تصفح المنتجات'));
+  loadCategories();
+});
+
+function selectProduct(p) {
+  selectedProductId   = p.id;
+  selectedProductName = p.name;
+  renderSelBar();
+  // Fire-and-forget — /chat also carries product_id defensively on every call,
+  // but setting it now means even a photo sent before any text question is scoped.
+  fetch(REST+'/chat/select-product',{
+    method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
+    body:JSON.stringify({session_token:sess(),product_id:p.id}),
+  }).catch(function(){});
+}
+
 /* ── Send message ────────────────────────────────────────────────── */
 function doSend() {
   if(vMode) return;
@@ -513,7 +562,7 @@ function doSend() {
   fetch(REST+'/chat',{
     method:'POST',
     headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
-    body:JSON.stringify({session_token:sess(),message:text}),
+    body:JSON.stringify({session_token:sess(),message:text,product_id:selectedProductId||undefined}),
   })
   .then(function(r){return r.json().then(function(d){return{ok:r.ok,s:r.status,d:d};});})
   .then(function(res){
@@ -521,6 +570,7 @@ function doSend() {
     var d=res.d;
     if(res.s===429||d.throttled){bubble('ai',d.reply||fb(),true);return;}
     if(!res.ok){bubble('ai',fb(),true);return;}
+    if(d.selected_model && !selectedProductName){selectedProductName=d.selected_model;renderSelBar();}
     bubble('ai',d.reply);
     if(d.mode==='clarify'){
       chips([
@@ -709,7 +759,7 @@ function sendPhoto(file){
   .then(function(d){
     if(!d.success||!d.data||!d.data.url) throw new Error('Upload failed.');
     return fetch(REST+'/chat/attachment',{method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':NONCE},
-      body:JSON.stringify({session_token:sess(),attachment_url:d.data.url,attachment_id:d.data.attachment_id||0,gemini_file_uri:d.data.gemini_file_uri||'',gemini_file_mime:d.data.gemini_file_mime||'image/jpeg'})}).then(function(r){return r.json();});
+      body:JSON.stringify({session_token:sess(),attachment_url:d.data.url,attachment_id:d.data.attachment_id||0,gemini_file_uri:d.data.gemini_file_uri||'',gemini_file_mime:d.data.gemini_file_mime||'image/jpeg',product_id:selectedProductId||undefined})}).then(function(r){return r.json();});
   })
   .then(function(d){hideTyping();bubble('ai',d.reply);})
   .catch(function(e){hideTyping();bubble('ai',e.message||fb(),true);})
@@ -748,7 +798,10 @@ $escBtn.addEventListener('click',escalate);
 
 /* ── Greeting ────────────────────────────────────────────────────── */
 if (CTX_PRODUCT) {
-  // Visitor opened widget from a product page — lead with that product.
+  // Visitor opened widget from a product page — lead with that product, and
+  // register it as the selected product so manual-grounded Q&A can use it
+  // right away, before any verification.
+  selectProduct(CTX_PRODUCT);
   bubble('ai', t(
     'Hello! 👋 I see you\'re looking at ' + CTX_PRODUCT.name + '. I can answer your questions about it, or help with support.',
     'مرحباً! 👋 أرى أنك تتصفح ' + CTX_PRODUCT.name + '. يمكنني الإجابة عن أسئلتك أو تقديم الدعم الفني.'

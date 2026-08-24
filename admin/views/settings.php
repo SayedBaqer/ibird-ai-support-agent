@@ -195,6 +195,15 @@
           <div class="aa-field__desc">International format. A WhatsApp deep-link is logged on escalation so the admin can tap to reply. Standard in Bahrain/GCC.</div>
         </div>
       </div>
+      <div style="margin-top:16px;">
+        <div class="aa-field">
+          <label>Webhook Secret (N8N / External)</label>
+          <input type="text" class="aa-input" name="webhook_secret"
+            value="<?php echo esc_attr( $settings['webhook_secret'] ?? '' ); ?>"
+            placeholder="Leave blank to disable auth">
+          <p class="aa-field__desc">Set a random secret and use it as the <code>X-Webhook-Secret</code> header in N8N. Leave blank to allow unauthenticated calls (not recommended for production). You can also regenerate this from the <a href="admin.php?page=aiagent-workspace">Workspace &rarr; WhatsApp / N8N tab</a>.</p>
+        </div>
+      </div>
     </div>
 
     <!-- ── Data Retention (PDPL Compliance) ──────────────────────────────── -->

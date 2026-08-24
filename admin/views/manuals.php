@@ -44,6 +44,7 @@ foreach ( $img_rows as $row ) {
 .aiagent-page .aa-notice{padding:12px 16px!important;border-radius:8px!important;font-size:13px!important;margin-bottom:8px!important;}
 .aiagent-page .aa-notice--success{background:#e8f5ee!important;color:#145530!important;border-left:4px solid #1a6b3c!important;}
 .aiagent-page .aa-notice--error{background:#fce4ec!important;color:#b71c1c!important;border-left:4px solid #ef5350!important;}
+.aiagent-page .aa-notice--info{background:#eff6ff!important;color:#1e40af!important;border-left:4px solid #3b82f6!important;}
 .aiagent-page .aa-empty{text-align:center!important;padding:32px 20px!important;color:#64748b!important;}
 @media(max-width:1100px){.aiagent-page .aa-side{flex:0 0 100%!important;width:100%!important;}}
 </style>
@@ -64,6 +65,14 @@ foreach ( $img_rows as $row ) {
           <input type="hidden" id="aa-model-id">
           <div id="aa-model-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #1a6b3c;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;max-height:220px;overflow-y:auto;"></div>
           <div class="aa-field__desc">Search by name or SKU — linked to WooCommerce/iStock products.</div>
+        </div>
+
+        <div class="aa-field">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;font-weight:600;color:#1e293b;">
+            <input type="checkbox" id="aa-common" style="width:auto;" onchange="aaToggleCommon(this.checked)">
+            🌐 General / applies to all products
+          </label>
+          <div class="aa-field__desc">For cross-product content (battery care, resets, connectivity, packaging…) instead of one specific model. The agent uses this for any product when nothing model-specific matches.</div>
         </div>
 
         <!-- Content tabs -->
@@ -99,6 +108,13 @@ foreach ( $img_rows as $row ) {
           <div id="aa-img-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
         </div>
 
+        <?php
+        $s = aiagent_settings();
+        if ( empty( $s['api_key'] ) ) : ?>
+        <div class="aa-notice aa-notice--error" style="display:block;margin-bottom:12px;">
+          ⚠️ <strong>Gemini API key not set.</strong> Go to <a href="<?php echo esc_url(admin_url('admin.php?page=aiagent-settings')); ?>">AI Agent → Settings</a> and enter your key before ingesting.
+        </div>
+        <?php endif; ?>
         <button class="aa-btn-primary" style="margin-top:4px;" id="aa-ingest-btn" onclick="aaIngest()">⚡ Ingest Manual</button>
         <div id="aa-manual-result" style="margin-top:14px;display:none;"></div>
       </div>
@@ -111,19 +127,21 @@ foreach ( $img_rows as $row ) {
       <?php if ( ! empty( $chunks ) ) : ?>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px;" id="aa-model-cards">
         <?php foreach ( $chunks as $ch ) :
-          $imgs = $model_images[ $ch->model ] ?? [];
+          $imgs  = $model_images[ $ch->model ] ?? [];
           $thumb = ! empty( $imgs ) ? $imgs[0] : '';
+          $is_common   = ( $ch->model === AIAgent_RAG::COMMON_MODEL );
+          $model_label = $is_common ? '🌐 General (All Products)' : $ch->model;
         ?>
         <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;" onclick="aaFilterModel('<?php echo esc_js($ch->model); ?>')">
           <?php if ( $thumb ) : ?>
             <div style="height:140px;overflow:hidden;background:#f0f2f5;">
-              <img src="<?php echo esc_url($thumb); ?>" alt="<?php echo esc_attr($ch->model); ?>" style="width:100%;height:100%;object-fit:cover;">
+              <img src="<?php echo esc_url($thumb); ?>" alt="<?php echo esc_attr($model_label); ?>" style="width:100%;height:100%;object-fit:cover;">
             </div>
           <?php else : ?>
-            <div style="height:140px;background:linear-gradient(135deg,#e8f5ee,#c8e6d4);display:flex;align-items:center;justify-content:center;font-size:40px;">📄</div>
+            <div style="height:140px;background:linear-gradient(135deg,#e8f5ee,#c8e6d4);display:flex;align-items:center;justify-content:center;font-size:40px;"><?php echo $is_common ? '🌐' : '📄'; ?></div>
           <?php endif; ?>
           <div style="padding:14px;">
-            <div style="font-weight:700;font-size:14px;margin-bottom:4px;"><?php echo esc_html($ch->model); ?></div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px;"><?php echo esc_html($model_label); ?></div>
             <div style="display:flex;align-items:center;justify-content:space-between;">
               <span class="aa-badge aa-badge--active"><?php echo (int)$ch->cnt; ?> chunks</span>
               <span style="font-size:11px;color:#94a3b8;"><?php echo esc_html(human_time_diff(strtotime($ch->last_ingested),time()).' ago'); ?></span>
@@ -159,9 +177,11 @@ foreach ( $img_rows as $row ) {
                 <div class="aa-empty__desc">Upload a product manual to get started.</div>
               </div>
             </td></tr>
-          <?php else : foreach ($chunks as $ch) : ?>
+          <?php else : foreach ($chunks as $ch) :
+            $row_label = ( $ch->model === AIAgent_RAG::COMMON_MODEL ) ? '🌐 General (All Products)' : $ch->model;
+          ?>
             <tr class="aa-chunk-row" data-model="<?php echo esc_attr(strtolower($ch->model)); ?>">
-              <td><strong><?php echo esc_html($ch->model); ?></strong></td>
+              <td><strong><?php echo esc_html($row_label); ?></strong></td>
               <td><span class="aa-badge aa-badge--active"><?php echo (int)$ch->cnt; ?> chunks</span></td>
               <td style="font-size:12px;color:#94a3b8;"><?php echo esc_html(human_time_diff(strtotime($ch->last_ingested),time()).' ago'); ?></td>
             </tr>
@@ -180,6 +200,14 @@ var aaNonce='<?php echo esc_js($nonce);?>';
 var aaManualNonce='<?php echo esc_js($manual_nonce);?>';
 var aaPdfNonce='<?php echo esc_js($pdf_nonce);?>';
 var aaAjax='<?php echo esc_js(admin_url("admin-ajax.php")); ?>';
+var AA_COMMON_MODEL='<?php echo esc_js( AIAgent_RAG::COMMON_MODEL ); ?>';
+
+function aaToggleCommon(checked){
+  var modelInp=document.getElementById('aa-model');
+  modelInp.disabled=checked;
+  modelInp.placeholder=checked?'General — applies to all products':'Type to search products…';
+  if(checked) modelInp.value='';
+}
 
 // Image preview
 document.getElementById('aa-img-files').addEventListener('change', function(){
@@ -214,17 +242,19 @@ function aaFilterModel(q){
 }
 
 async function aaIngest(){
-  var model=document.getElementById('aa-model').value.trim();
-  if(!model){aaResult('Please enter a product model.','error');return;}
+  var isCommon=document.getElementById('aa-common').checked;
+  var model=isCommon?AA_COMMON_MODEL:document.getElementById('aa-model').value.trim();
+  if(!model){aaResult('⚠️ Please enter a product model.','error');return;}
 
   var btn=document.getElementById('aa-ingest-btn');
-  btn.disabled=true;btn.textContent='Working…';
+  btn.disabled=true;
   document.getElementById('aa-manual-result').style.display='none';
 
-  // Step 1: upload images first (if any).
+  // Step 1 — upload images (if any).
   var imgFiles=document.getElementById('aa-img-files').files;
   var imgUrls=[];
   for(var i=0;i<imgFiles.length;i++){
+    btn.textContent='⏫ Uploading image '+(i+1)+'/'+imgFiles.length+'…';
     var fd=new FormData();
     fd.append('file',imgFiles[i]);
     fd.append('action','aiagent_upload_attachment');
@@ -236,40 +266,76 @@ async function aaIngest(){
     }catch(e){}
   }
 
-  // Step 2: get text (PDF or paste).
+  // Step 2 — get text content.
   var activeTab=document.getElementById('aa-tab-pdf').style.display!=='none'?'pdf':'text';
   var text='',source='pasted-text',section='';
 
   if(activeTab==='pdf'){
     var pdfFile=document.getElementById('aa-pdf-file').files[0];
     if(!pdfFile){
-      if(imgUrls.length===0){aaResult('Please select a PDF file.','error');btn.disabled=false;btn.textContent='⚡ Ingest Manual';return;}
-      // Images-only ingest (no PDF text).
+      if(imgUrls.length===0){
+        aaResult('⚠️ Please select a PDF file or switch to the Text tab.','error');
+        btn.disabled=false;btn.textContent='⚡ Ingest Manual';return;
+      }
       text='[Product images uploaded for model '+model+']';
     } else {
+
+      // ── Phase A: upload file to Gemini ─────────────────────────────────────
+      btn.textContent='⏳ Uploading PDF to Gemini… (may take 30s)';
+      aaResult('⏳ Step 1/3 — Uploading PDF to Gemini File API…','info');
+
       var fd2=new FormData();
-      fd2.append('file',pdfFile);fd2.append('action','aiagent_upload_manual');fd2.append('_ajax_nonce',aaPdfNonce);
-      btn.textContent='⏳ Uploading to Gemini…';
+      fd2.append('file',pdfFile);
+      fd2.append('action','aiagent_manual_upload_to_gemini');
+      fd2.append('_ajax_nonce',aaPdfNonce);
+
+      var uploadData;
       try{
-        var pr=await fetch(aaAjax,{method:'POST',body:fd2});
-        btn.textContent='🧠 Gemini reading PDF…';
-        var pd=await pr.json();
-        if(!pd.success)throw new Error(pd.data&&pd.data.error?pd.data.error:'PDF extraction failed.');
-        text=pd.data.text;source=pdfFile.name;
-      } catch(e){
-        aaResult(e.message||'PDF extraction failed — check the Gemini API key and that the file is a valid PDF or image.','error');
-        btn.disabled=false;btn.textContent='⚡ Ingest Manual';
-        return;
+        var upResp=await fetch(aaAjax,{method:'POST',body:fd2});
+        var upJson=await upResp.json();
+        if(!upJson.success){
+          throw new Error(upJson.data&&upJson.data.error?upJson.data.error:'Upload to Gemini failed.');
+        }
+        uploadData=upJson.data;
+      }catch(e){
+        aaResult('❌ Upload failed: '+(e.message||'Could not upload file.'),'error');
+        btn.disabled=false;btn.textContent='⚡ Ingest Manual';return;
+      }
+
+      // ── Phase B: ask Gemini to extract text ────────────────────────────────
+      btn.textContent='🧠 Gemini reading PDF… (may take 60–90s)';
+      aaResult('⏳ Step 2/3 — Gemini is reading and extracting the manual text…','info');
+
+      var fd3=new FormData();
+      fd3.append('action','aiagent_manual_analyze_gemini');
+      fd3.append('_ajax_nonce',aaPdfNonce);
+      fd3.append('file_uri',uploadData.file_uri);
+      fd3.append('file_name',uploadData.file_name);
+      fd3.append('mime',uploadData.mime);
+      fd3.append('is_pdf',uploadData.is_pdf?'true':'false');
+
+      try{
+        var anResp=await fetch(aaAjax,{method:'POST',body:fd3});
+        var anJson=await anResp.json();
+        if(!anJson.success){
+          throw new Error(anJson.data&&anJson.data.error?anJson.data.error:'Gemini text extraction failed.');
+        }
+        text=anJson.data.text;
+        source=pdfFile.name;
+      }catch(e){
+        aaResult('❌ Gemini extraction failed: '+(e.message||'Unknown error.'),'error');
+        btn.disabled=false;btn.textContent='⚡ Ingest Manual';return;
       }
     }
   } else {
     text=document.getElementById('aa-manual-text').value.trim();
     section=document.getElementById('aa-section-title').value.trim();
-    if(!text){aaResult('Please paste some text.','error');btn.disabled=false;btn.textContent='⚡ Ingest Manual';return;}
+    if(!text){aaResult('⚠️ Please paste some text.','error');btn.disabled=false;btn.textContent='⚡ Ingest Manual';return;}
   }
 
-  // Step 3: send to REST.
-  btn.textContent='Ingesting…';
+  // Step 3 — chunk, embed, extract Q&A and store.
+  btn.textContent='💾 Chunking, embedding & extracting Q&A…';
+  aaResult('⏳ Step 3/3 — Chunking text, generating embeddings and extracting Q&A pairs…','info');
   try{
     var res=await fetch(aaRest+'/admin/manual',{
       method:'POST',
@@ -277,15 +343,29 @@ async function aaIngest(){
       body:JSON.stringify({model:model,text:text,section_title:section,source_file:source,image_urls:imgUrls})
     });
     var data=await res.json();
-    aaResult('✅ Ingested <strong>'+(data.chunks||0)+' chunks</strong> for <strong>'+model+'</strong>'+(imgUrls.length?' + <strong>'+imgUrls.length+' image(s)</strong>':'')+'.');
-    // Reset form.
+    if(data.code&&!data.chunks&&data.chunks!==0){throw new Error(data.message||'REST error: '+JSON.stringify(data));}
+
+    var summary='✅ <strong>Ingestion complete for '+model+'</strong><br>'
+      +'📄 <strong>'+(data.chunks||0)+'</strong> manual chunks stored'
+      +(imgUrls.length?' · 🖼 <strong>'+imgUrls.length+'</strong> image(s)':'')
+      +(data.qa_stored?'<br>🧠 <strong>'+(data.qa_stored)+'</strong> Q&A pairs extracted and saved to Teach AI':'')
+      +(data.qa_skipped?' (<em>'+data.qa_skipped+' duplicates skipped</em>)':'')
+      +(data.embed_status?'<br><small style="color:#6b7280;">⏳ '+data.embed_status+'</small>':'');
+
+    // Show extracted text preview if available.
+    if(data.text_preview){
+      summary+='<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:600;color:#1e40af;">👁 Preview extracted text (first 2 000 chars)</summary>'
+        +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;background:#f8fafc;padding:10px;border-radius:6px;margin-top:8px;max-height:300px;overflow-y:auto;">'+data.text_preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+    }
+
+    aaResult(summary,'success');
     document.getElementById('aa-model').value='';
     document.getElementById('aa-pdf-file').value='';
     document.getElementById('aa-manual-text').value='';
     document.getElementById('aa-img-files').value='';
     document.getElementById('aa-img-preview').innerHTML='';
   } catch(e){
-    aaResult((e.message||'Error ingesting manual.'),'error');
+    aaResult('❌ Chunk/embed step failed: '+(e.message||'Unknown error.'),'error');
   }
   btn.disabled=false;btn.textContent='⚡ Ingest Manual';
 }

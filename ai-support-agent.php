@@ -3,7 +3,7 @@
  * Plugin Name: AI Support Agent
  * Plugin URI:  https://ibird.bh
  * Description: Self-improving AI support agent for WooCommerce — bilingual EN/AR, RAG knowledge base, Mode A product Q&A + Mode B verified support.
- * Version:     1.0.8
+ * Version:     1.9.0
  * Author:      iBird
  * Text Domain: ai-support-agent
  * Domain Path: /languages
@@ -14,15 +14,16 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AIAGENT_VERSION',    '1.2.0' );
+define( 'AIAGENT_VERSION',    '1.9.0' );
 define( 'AIAGENT_FILE',       __FILE__ );
 define( 'AIAGENT_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'AIAGENT_URL',        plugin_dir_url( __FILE__ ) );
-define( 'AIAGENT_DB_VER',     '4' );
+define( 'AIAGENT_DB_VER',     '8' );
 define( 'AIAGENT_GITHUB_REPO', 'SayedBaqer/ibird-ai-support-agent' );
 
 // ── Autoload includes ────────────────────────────────────────────────────────
 require_once AIAGENT_DIR . 'includes/class-aiagent-db.php';
+require_once AIAGENT_DIR . 'includes/class-aiagent-updater.php';
 require_once AIAGENT_DIR . 'includes/class-aiagent-i18n.php';
 require_once AIAGENT_DIR . 'includes/class-aiagent-file-api.php';
 require_once AIAGENT_DIR . 'includes/class-aiagent-llm.php';
@@ -51,16 +52,15 @@ function aiagent_activate() {
 	}
 	AIAgent_DB::install();
 	update_option( 'aiagent_db_version', AIAGENT_DB_VER );
-	// Seed default settings if not present.
 	if ( ! get_option( 'aiagent_settings' ) ) {
 		update_option( 'aiagent_settings', aiagent_default_settings() );
 	}
+	aiagent_schedule_retention();
 }
 
-// ── Deactivation ─────────────────────────────────────────────────────────────
 register_deactivation_hook( __FILE__, 'aiagent_deactivate' );
 function aiagent_deactivate() {
-	// Nothing destructive on deactivate; tables remain.
+	aiagent_unschedule_retention();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -90,6 +90,7 @@ function aiagent_default_settings() {
 		// Escalation notifications.
 		'whatsapp_number'         => '',  // WhatsApp number to notify on escalation (intl format: +973XXXXXXXX).
 		'notify_email'            => '',  // Email to CC on new tickets (leave blank to use admin email).
+		'webhook_secret'          => '',  // Shared secret for N8N / external webhook auth.
 		// Throttle.
 		'daily_cap'           => 1200,
 		'session_cap'         => 20,
@@ -134,6 +135,7 @@ function aiagent_boot() {
 
 	AIAgent_REST::init();
 	AIAgent_Widget::init();
+	( new AIAgent_Updater() )->init();
 
 	if ( is_admin() ) {
 		AIAgent_Admin::init();
@@ -183,108 +185,43 @@ function aiagent_run_retention(): void {
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}aiagent_semantic_cache WHERE expires_at < NOW()" );
 }
 
-// ── GitHub Auto-Updater ───────────────────────────────────────────────────────
-// Polls the GitHub Releases API (once per hour, cached in WP transient).
-// When a new version tag is found, WordPress shows "Update available" in the
-// Plugins list — click Update to fetch and install in place, no reinstall needed.
-// Requires a GitHub PAT with contents:read scope for private repos (set in Settings).
+// ── Background embedding cron jobs ───────────────────────────────────────────
+// After a manual is ingested, chunks and Q&A examples are stored immediately
+// (no API calls). These cron jobs run seconds later to fill in the embeddings.
+// They reschedule themselves until all rows are embedded.
 
-add_filter( 'pre_set_site_transient_update_plugins', 'aiagent_github_update_check' );
-function aiagent_github_update_check( $transient ) {
-	if ( empty( $transient->checked ) ) return $transient;
-
-	$settings = aiagent_settings();
-	$token    = trim( $settings['github_token'] ?? '' );
-	$slug     = plugin_basename( AIAGENT_FILE );
-
-	// Cache result for 1 hour to avoid hammering the GitHub API.
-	$cache_key = 'aiagent_github_release';
-	$release   = get_transient( $cache_key );
-
-	if ( $release === false ) {
-		$api_url = 'https://api.github.com/repos/' . AIAGENT_GITHUB_REPO . '/releases/latest';
-		$headers = [
-			'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . get_bloginfo( 'url' ),
-			'Accept'     => 'application/vnd.github+json',
-		];
-		if ( $token !== '' ) {
-			$headers['Authorization'] = 'Bearer ' . $token;
-		}
-
-		$response = wp_remote_get( $api_url, [ 'headers' => $headers, 'timeout' => 10 ] );
-
-		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-			set_transient( $cache_key, 'error', HOUR_IN_SECONDS );
-			return $transient;
-		}
-
-		$release = json_decode( wp_remote_retrieve_body( $response ), true );
-		set_transient( $cache_key, $release, HOUR_IN_SECONDS );
+add_action( 'aiagent_embed_chunks_cron', 'aiagent_run_embed_chunks' );
+function aiagent_run_embed_chunks(): void {
+	@set_time_limit( 120 );
+	if ( class_exists( 'AIAgent_RAG' ) ) {
+		AIAgent_RAG::embed_pending_chunks( 40 );
 	}
-
-	if ( ! is_array( $release ) || empty( $release['tag_name'] ) ) return $transient;
-
-	$latest_version = ltrim( $release['tag_name'], 'v' );
-
-	if ( version_compare( $latest_version, AIAGENT_VERSION, '<=' ) ) return $transient;
-
-	// Find the zip asset in the release.
-	$download_url = '';
-	foreach ( $release['assets'] ?? [] as $asset ) {
-		if ( str_ends_with( $asset['name'], '.zip' ) ) {
-			$download_url = $asset['browser_download_url'];
-			break;
-		}
-	}
-
-	// For private repos, browser_download_url requires auth — use the API download URL instead.
-	if ( $download_url === '' && ! empty( $release['assets'][0]['url'] ) ) {
-		$download_url = $release['assets'][0]['url'];
-	}
-
-	if ( $download_url === '' ) return $transient;
-
-	// If the repo is private, inject the token into the download URL via a WP filter.
-	if ( $token !== '' ) {
-		add_filter( 'upgrader_pre_download', function ( $reply, $package, $upgrader ) use ( $token, $download_url ) {
-			if ( strpos( $package, 'api.github.com' ) !== false || $package === $download_url ) {
-				// Download the asset via the API with auth, save to a temp file,
-				// then hand WordPress the local path.
-				$tmp  = download_url( $package, 300, true ); // standard WP download (no auth)
-				if ( is_wp_error( $tmp ) ) {
-					// Auth-required download for private asset.
-					$resp = wp_remote_get( $package, [
-						'headers' => [
-							'Authorization' => 'Bearer ' . $token,
-							'Accept'        => 'application/octet-stream',
-							'User-Agent'    => 'WordPress',
-						],
-						'timeout' => 120,
-						'stream'  => true,
-						'filename'=> wp_tempnam( 'aiagent_update' ),
-					] );
-					if ( ! is_wp_error( $resp ) && wp_remote_retrieve_response_code( $resp ) === 200 ) {
-						return $resp['filename'];
-					}
-				}
-				return $tmp;
-			}
-			return $reply;
-		}, 10, 3 );
-	}
-
-	$transient->response[ $slug ] = (object) [
-		'slug'        => dirname( $slug ),
-		'plugin'      => $slug,
-		'new_version' => $latest_version,
-		'url'         => 'https://github.com/' . AIAGENT_GITHUB_REPO,
-		'package'     => $download_url,
-	];
-
-	return $transient;
 }
 
-// Clear the update cache when settings are saved (in case token was just added).
-add_action( 'update_option_aiagent_settings', function () {
-	delete_transient( 'aiagent_github_release' );
-} );
+add_action( 'aiagent_embed_examples_cron', 'aiagent_run_embed_examples' );
+function aiagent_run_embed_examples(): void {
+	@set_time_limit( 120 );
+	if ( class_exists( 'AIAgent_RAG' ) ) {
+		AIAgent_RAG::embed_pending_examples( 30 );
+	}
+}
+
+// ── GitHub updater AJAX handlers ─────────────────────────────────────────────
+// The updater logic lives in AIAgent_Updater (includes/class-aiagent-updater.php).
+// These handlers are the bridge between the Updates admin page and that class.
+
+add_action( 'wp_ajax_aiagent_publish_release', 'aiagent_ajax_publish_release' );
+function aiagent_ajax_publish_release(): void {
+	@set_time_limit( 0 );
+	@ignore_user_abort( true );
+	check_ajax_referer( 'aiagent_nonce', 'nonce' );
+	if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	wp_send_json_success( AIAgent_Updater::publish_github_release() );
+}
+
+add_action( 'wp_ajax_aiagent_update_now', 'aiagent_ajax_update_now' );
+function aiagent_ajax_update_now(): void {
+	check_ajax_referer( 'aiagent_nonce', 'nonce' );
+	if ( ! current_user_can( 'update_plugins' ) ) wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	wp_send_json_success( AIAgent_Updater::update_now() );
+}

@@ -298,6 +298,55 @@ class AIAgent_LLM {
 		return $data['embedding']['values'];
 	}
 
+	/**
+	 * Extract Q&A pairs from a block of text (e.g. a manual).
+	 * Returns array of ['question'=>string, 'answer'=>string].
+	 */
+	public static function extract_qa_pairs( string $text, int $max_pairs = 30 ): array {
+		$settings = aiagent_settings();
+		$api_key  = $settings['api_key'] ?? '';
+		if ( $api_key === '' || $text === '' ) return [];
+
+		// Truncate very large texts — Flash has a 1M context but keep costs low.
+		$body = mb_substr( $text, 0, 40000 );
+
+		$prompt = "Extract up to {$max_pairs} Q&A pairs from the following product manual text for a customer support knowledge base.\n\n"
+		        . "Return ONLY a JSON array — no markdown, no extra text:\n"
+		        . "[\n  {\"question\": \"How do I reset the device?\", \"answer\": \"Hold the reset button for 5 seconds.\"},\n  ...\n]\n\n"
+		        . "Rules:\n"
+		        . "- Cover: installation, setup, error codes, troubleshooting, maintenance, safety, specifications\n"
+		        . "- Each answer must be complete and stand alone (no references like 'see above')\n"
+		        . "- Skip questions with no clear answer in the text\n"
+		        . "- If the manual is bilingual, produce pairs in both languages\n\n"
+		        . "Manual text:\n{$body}";
+
+		$model   = $settings['model_reply'];
+		$url     = self::$gemini_base . "/models/{$model}:generateContent?key=" . rawurlencode( $api_key );
+		$payload = [
+			'contents'         => [ [ 'role' => 'user', 'parts' => [ [ 'text' => $prompt ] ] ] ],
+			'generationConfig' => [ 'temperature' => 0.1, 'maxOutputTokens' => 8192 ],
+		];
+
+		$response = wp_remote_post( $url, [
+			'headers' => [ 'Content-Type' => 'application/json' ],
+			'body'    => wp_json_encode( $payload ),
+			'timeout' => 60,
+		] );
+
+		if ( is_wp_error( $response ) ) return [];
+
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		$raw  = '';
+		foreach ( $data['candidates'][0]['content']['parts'] ?? [] as $part ) {
+			if ( isset( $part['text'] ) && empty( $part['thought'] ) ) $raw .= $part['text'];
+		}
+
+		// Strip stray markdown fences.
+		$raw = trim( (string) preg_replace( '/^```(?:json)?\s*/i', '', preg_replace( '/\s*```$/i', '', trim( $raw ) ) ) );
+		$pairs = json_decode( $raw, true );
+		return ( is_array( $pairs ) ) ? $pairs : [];
+	}
+
 	// ── Gemini backend ────────────────────────────────────────────────────────
 
 	private static function gemini_reply(
@@ -352,11 +401,12 @@ class AIAgent_LLM {
 		}
 
 		// ── Generation config — token budget by request type ─────────────────
-		// Support answers rarely exceed 400 tokens; capping at 512 reduces output
-		// cost vs the old 2048 default. Thinking mode needs headroom for reasoning.
-		$default_max  = $use_thinking ? 8192 : 512;
+		// Default 1024 for normal replies (was 512 — too restrictive for multi-step answers).
+		// Thinking mode gets 8192 for reasoning headroom. Both are overrideable from settings.
+		$default_max  = $use_thinking ? 8192 : (int) ( $settings['max_output_tokens'] ?? 1024 );
 		$max_tokens   = (int) ( $opts['max_output_tokens'] ?? $default_max );
-		$gen_config   = [ 'temperature' => 0.4, 'maxOutputTokens' => $max_tokens ];
+		$temperature  = (float) ( $settings['temperature'] ?? 0.5 );
+		$gen_config   = [ 'temperature' => $temperature, 'maxOutputTokens' => $max_tokens ];
 		if ( $use_thinking && $t_budget > 0 ) {
 			$gen_config['thinkingConfig'] = [ 'thinkingBudget' => $t_budget ];
 		}
@@ -460,11 +510,12 @@ class AIAgent_LLM {
 			if ( $content !== '' ) $oai_messages[] = [ 'role' => $role, 'content' => $content ];
 		}
 
+		$settings_oai = aiagent_settings();
 		$payload = [
 			'model'       => $model,
 			'messages'    => $oai_messages,
-			'temperature' => 0.4,
-			'max_tokens'  => 1024,
+			'temperature' => (float) ( $settings_oai['temperature'] ?? 0.5 ),
+			'max_tokens'  => (int) ( $settings_oai['max_output_tokens'] ?? 1024 ),
 		];
 
 		if ( ! empty( $tools ) ) {

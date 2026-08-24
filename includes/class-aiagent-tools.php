@@ -7,14 +7,33 @@ class AIAgent_Tools {
 
 	/**
 	 * Return tool declarations appropriate for the current conversation mode.
-	 * Mode A (product): search_products + search_taught_examples + escalate
-	 * Mode B (support, verified): search_manual + search_taught_examples + escalate
+	 *
+	 * search_taught_examples, search_common_knowledge, escalate_to_human — always available.
+	 * search_products — Mode A (pre-sales) only.
+	 * search_manual   — available whenever a model is known: verified (Mode B) OR the
+	 *                    customer has selected a product in Mode A (unverified — general
+	 *                    usage/troubleshooting only, no warranty/order facts).
+	 *
+	 * @param string $mode      'product' | 'support'
+	 * @param bool   $has_model Whether a model is known for this conversation (verified_model
+	 *                          in support mode, or selected_model in product mode).
 	 */
-	public static function declarations( string $mode = 'product' ): array {
+	public static function declarations( string $mode = 'product', bool $has_model = false ): array {
 		$common = [
 			[
 				'name'        => 'search_taught_examples',
 				'description' => 'Search the knowledge base for pre-taught Q&A pairs that match the customer question.',
+				'parameters'  => [
+					'type'       => 'object',
+					'properties' => [
+						'question' => [ 'type' => 'string', 'description' => 'Customer question to match' ],
+					],
+					'required' => [ 'question' ],
+				],
+			],
+			[
+				'name'        => 'search_common_knowledge',
+				'description' => 'Search general troubleshooting/how-to knowledge that applies across all products (battery care, resets, connectivity, packaging, etc.) — not tied to one specific model.',
 				'parameters'  => [
 					'type'       => 'object',
 					'properties' => [
@@ -39,7 +58,7 @@ class AIAgent_Tools {
 		if ( $mode === 'product' ) {
 			array_unshift( $common, [
 				'name'        => 'search_products',
-				'description' => 'Search WooCommerce products by a customer query. Use this for pre-sales product questions — features, specs, price, availability. Do NOT use for troubleshooting.',
+				'description' => 'Search WooCommerce products by a customer query. Use this for pre-sales product questions — features, specs, price, availability.',
 				'parameters'  => [
 					'type'       => 'object',
 					'properties' => [
@@ -50,10 +69,13 @@ class AIAgent_Tools {
 			] );
 		}
 
-		if ( $mode === 'support' ) {
+		if ( $has_model ) {
+			$desc = $mode === 'support'
+				? 'Search the product manual for the verified customer\'s model to find troubleshooting steps, usage instructions, and technical guidance.'
+				: 'Search the manual for the product the customer has selected — general usage instructions and troubleshooting steps only. Do NOT use this to state warranty status or promise replacement/repair; those require ownership verification.';
 			array_unshift( $common, [
 				'name'        => 'search_manual',
-				'description' => 'Search the product manual for the verified customer\'s model to find troubleshooting steps, usage instructions, and technical guidance.',
+				'description' => $desc,
 				'parameters'  => [
 					'type'       => 'object',
 					'properties' => [
@@ -92,13 +114,20 @@ class AIAgent_Tools {
 				return self::search_products( sanitize_text_field( $args['query'] ?? '' ) );
 
 			case 'search_manual':
-				// Guard: only allowed when verified (Mode B).
-				if ( $mode !== 'support' ) {
-					return '[search_manual not available — customer ownership not verified]';
+				// Guard: allowed when verified (Mode B) OR a product is selected (Mode A, unverified).
+				$context_model = $context['verified_model'] ?? $context['selected_model'] ?? '';
+				if ( $mode !== 'support' && empty( $context_model ) ) {
+					return '[search_manual not available — no product selected and ownership not verified]';
 				}
 				return self::search_manual(
 					sanitize_text_field( $args['question'] ?? '' ),
-					sanitize_text_field( $args['model'] ?? $context['verified_model'] ?? '' )
+					sanitize_text_field( $args['model'] ?? $context_model )
+				);
+
+			case 'search_common_knowledge':
+				return self::search_manual(
+					sanitize_text_field( $args['question'] ?? '' ),
+					AIAgent_RAG::COMMON_MODEL
 				);
 
 			case 'search_taught_examples':
@@ -182,7 +211,7 @@ class AIAgent_Tools {
 		return $lines ? implode( "\n\n---\n\n", $lines ) : 'No product details available.';
 	}
 
-	// ── Tool: search_manual (Mode B, verified only) ───────────────────────────
+	// ── Tool: search_manual (verified support, or an unverified selected product) ──
 
 	/**
 	 * Tracks the Gemini context cache name resolved during the last search_manual call.
@@ -236,13 +265,25 @@ class AIAgent_Tools {
 			return 'No matching knowledge base entries found.';
 		}
 
-		$parts = [];
-		foreach ( $results as $r ) {
-			$parts[] = "Q: {$r['question']}\nA: {$r['solution']}";
+		// Track which examples were actually used — increments usage_count + last_used
+		// so the admin UI can show what the AI retrieves most and what's never used.
+		$ids = array_filter( array_column( $results, 'id' ) );
+		if ( ! empty( $ids ) ) {
+			AIAgent_RAG::increment_usage( $ids );
 		}
 
-		return implode( "\n\n---\n\n", $parts );
+		$parts = [];
+		foreach ( $results as $r ) {
+			$score_pct = round( $r['score'] * 100 );
+			$parts[] = "Q: {$r['question']}\nA: {$r['solution']}\n[relevance: {$score_pct}%]";
+		}
+
+		$context = implode( "\n\n---\n\n", $parts );
+		return "Knowledge base matches (adapt these to the customer's question — do not copy verbatim):\n\n{$context}";
 	}
+
+	// ── Expose last-used example IDs to the caller (for confidence decay on escalation) ──
+	public static array $last_example_ids = [];
 
 	// ── Tool: escalate_to_human ───────────────────────────────────────────────
 
@@ -274,6 +315,13 @@ class AIAgent_Tools {
 			[ 'id'     => $conversation_id ],
 			[ '%s' ], [ '%d' ]
 		);
+
+		// When examples were retrieved this turn but still led to escalation, decay
+		// their confidence slightly — they were not helpful enough to avoid escalation.
+		if ( ! empty( self::$last_example_ids ) ) {
+			AIAgent_RAG::decay_confidence( self::$last_example_ids );
+			self::$last_example_ids = [];
+		}
 
 		// Notify the admin team immediately — email always, WhatsApp link if configured.
 		self::notify_escalation( $ticket_id, $reason, $conversation_id );

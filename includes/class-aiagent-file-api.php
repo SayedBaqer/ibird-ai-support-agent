@@ -184,6 +184,7 @@ class AIAgent_File_API {
 
 		$model   = $opts['model'] ?? $settings['model_reply'];
 		$url     = self::$api_base . "/models/{$model}:generateContent?key=" . rawurlencode( $api_key );
+		$max_tokens = (int) ( $opts['max_output_tokens'] ?? 8192 );
 		$payload = [
 			'contents' => [ [
 				'role'  => 'user',
@@ -192,7 +193,7 @@ class AIAgent_File_API {
 					[ 'text'     => $prompt ],
 				],
 			] ],
-			'generationConfig' => [ 'temperature' => 0.2, 'maxOutputTokens' => 8192 ],
+			'generationConfig' => [ 'temperature' => 0.1, 'maxOutputTokens' => $max_tokens ],
 		];
 
 		if ( ! empty( $opts['thinking'] ) ) {
@@ -200,7 +201,7 @@ class AIAgent_File_API {
 			$payload['generationConfig']['thinkingConfig'] = [ 'thinkingBudget' => $budget ];
 		}
 
-		$timeout  = ! empty( $opts['thinking'] ) ? 120 : 90;
+		$timeout  = ! empty( $opts['thinking'] ) ? 180 : 90;
 		$response = wp_remote_post( $url, [
 			'headers' => [ 'Content-Type' => 'application/json' ],
 			'body'    => wp_json_encode( $payload ),

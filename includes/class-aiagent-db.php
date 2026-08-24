@@ -15,8 +15,11 @@ class AIAgent_DB {
 			customer_ref   BIGINT UNSIGNED          DEFAULT NULL,
 			mode           ENUM('product','support') NOT NULL DEFAULT 'product',
 			language       ENUM('en','ar')           NOT NULL DEFAULT 'en',
-			status         ENUM('active','escalated','closed') NOT NULL DEFAULT 'active',
+			status         ENUM('active','escalated','claimed','closed') NOT NULL DEFAULT 'active',
 			verified_model VARCHAR(255)             DEFAULT NULL,
+			in_warranty    TINYINT(1)               DEFAULT NULL,
+			selected_product_id BIGINT UNSIGNED    DEFAULT NULL,
+			selected_model VARCHAR(255)             DEFAULT NULL,
 			created_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
@@ -86,11 +89,24 @@ class AIAgent_DB {
 			embedding         LONGBLOB        DEFAULT NULL,
 			image_url         TEXT            DEFAULT NULL,
 			image_description LONGTEXT        DEFAULT NULL,
+			confidence        FLOAT           NOT NULL DEFAULT 1.0,
+			usage_count       INT UNSIGNED    NOT NULL DEFAULT 0,
+			last_used         DATETIME        DEFAULT NULL,
+			source            VARCHAR(30)     NOT NULL DEFAULT 'manual',
 			created_by        BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			KEY category_id (category_id)
+			KEY category_id (category_id),
+			KEY source (source),
+			KEY usage_count (usage_count)
 		) $charset;" );
+
+		// Add FULLTEXT index for hybrid search (MySQL 5.6+ / MariaDB support FULLTEXT on InnoDB).
+		// Do this outside dbDelta since dbDelta doesn't manage FULLTEXT indexes.
+		$has_ft = $wpdb->get_var( "SHOW INDEX FROM {$wpdb->prefix}aiagent_taught_examples WHERE Key_name = 'ft_qa'" );
+		if ( ! $has_ft ) {
+			$wpdb->query( "ALTER TABLE {$wpdb->prefix}aiagent_taught_examples ADD FULLTEXT KEY ft_qa (question, solution)" );
+		}
 
 		// policy_rules
 		dbDelta( "CREATE TABLE {$wpdb->prefix}aiagent_policy_rules (
@@ -161,11 +177,13 @@ class AIAgent_DB {
 			question   TEXT         NOT NULL,
 			answer     LONGTEXT     NOT NULL,
 			embedding  LONGBLOB     NOT NULL,
+			model      VARCHAR(255) NOT NULL DEFAULT '',
 			hits       INT UNSIGNED NOT NULL DEFAULT 0,
 			created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			expires_at DATETIME     NOT NULL,
 			PRIMARY KEY (id),
-			KEY expires_at (expires_at)
+			KEY expires_at (expires_at),
+			KEY model (model)
 		) $charset;" );
 
 		// Seed default policy rules if table is empty.

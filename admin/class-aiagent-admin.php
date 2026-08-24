@@ -6,14 +6,34 @@ class AIAgent_Admin {
 	public static function init(): void {
 		add_action( 'admin_menu',              [ __CLASS__, 'register_menus' ] );
 		add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_assets' ] );
+		add_action( 'admin_footer',            [ __CLASS__, 'footer_scripts' ] );
 
 		// Form submissions.
 		add_action( 'admin_post_aiagent_save_settings',     [ __CLASS__, 'save_settings' ] );
 		add_action( 'admin_post_aiagent_add_category',      [ __CLASS__, 'add_category' ] );
 		add_action( 'admin_post_aiagent_approve_category',  [ __CLASS__, 'approve_category' ] );
 
-		// AJAX: PDF upload (server-side text extraction).
-		add_action( 'wp_ajax_aiagent_upload_manual', [ __CLASS__, 'ajax_upload_manual' ] );
+		// AJAX: PDF upload split into two calls (upload to Gemini, then analyze).
+		add_action( 'wp_ajax_aiagent_upload_manual',         [ __CLASS__, 'ajax_upload_manual' ] );
+		add_action( 'wp_ajax_aiagent_manual_upload_to_gemini', [ __CLASS__, 'ajax_manual_upload_to_gemini' ] );
+		add_action( 'wp_ajax_aiagent_manual_analyze_gemini',   [ __CLASS__, 'ajax_manual_analyze_gemini' ] );
+	}
+
+	public static function footer_scripts(): void {
+		$nonce = wp_create_nonce( 'aiagent_nonce' );
+		echo '<script>
+(function(){
+  document.addEventListener("click",function(e){
+    var btn=e.target.closest(".notice[data-aiagent-update-notice] .notice-dismiss");
+    if(!btn) return;
+    var notice=btn.closest("[data-aiagent-update-notice]");
+    var version=notice?notice.dataset.aiagentUpdateNotice:"";
+    if(!version) return;
+    fetch(ajaxurl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:"action=aiagent_dismiss_update_notice&nonce=' . esc_js( $nonce ) . '&version="+encodeURIComponent(version)});
+  });
+})();
+</script>' . "\n";
 	}
 
 	// ── Menus ─────────────────────────────────────────────────────────────────
@@ -39,6 +59,7 @@ class AIAgent_Admin {
 		add_submenu_page( 'aiagent', __( 'Serial Registry', 'ai-support-agent' ), __( 'Serials',     'ai-support-agent' ), 'manage_options', 'aiagent-serials',         [ __CLASS__, 'page_serials' ] );
 		add_submenu_page( 'aiagent', __( 'Analytics',     'ai-support-agent' ), __( 'Analytics',     'ai-support-agent' ), 'manage_options', 'aiagent-analytics',       [ __CLASS__, 'page_analytics' ] );
 		add_submenu_page( 'aiagent', __( 'Settings',      'ai-support-agent' ), __( 'Settings',      'ai-support-agent' ), 'manage_options', 'aiagent-settings',        [ __CLASS__, 'page_settings' ] );
+		add_submenu_page( 'aiagent', __( 'Updates',       'ai-support-agent' ), __( '🔄 Updates',     'ai-support-agent' ), 'manage_options', 'aiagent-updates',         [ __CLASS__, 'page_updates' ] );
 	}
 
 	// ── Assets ────────────────────────────────────────────────────────────────
@@ -52,6 +73,11 @@ class AIAgent_Admin {
 	}
 
 	// ── Pages ─────────────────────────────────────────────────────────────────
+
+	public static function page_updates(): void {
+		self::require_cap();
+		include AIAGENT_DIR . 'admin/views/updates.php';
+	}
 
 	public static function page_settings(): void {
 		self::require_cap();
@@ -232,6 +258,7 @@ class AIAgent_Admin {
 			// Escalation notifications.
 			'notify_email'        => sanitize_email( $post['notify_email']      ?? $current['notify_email'] ?? '' ),
 			'whatsapp_number'     => sanitize_text_field( $post['whatsapp_number'] ?? $current['whatsapp_number'] ?? '' ),
+			'webhook_secret'      => sanitize_text_field( $post['webhook_secret']  ?? $current['webhook_secret']  ?? '' ),
 			// Data retention (PDPL compliance).
 			'data_retention_days' => max( 30, min( 365, absint( $post['data_retention_days'] ?? $current['data_retention_days'] ?? 90 ) ) ),
 			// Throttle.
@@ -291,9 +318,132 @@ class AIAgent_Admin {
 		exit;
 	}
 
-	// ── AJAX: PDF upload + text extraction ────────────────────────────────────
+	// ── AJAX: Step 1 — upload file to Gemini, return file_uri ───────────────
+	// Split from analyze so each step has its own PHP timeout and the browser
+	// can show a distinct progress message per phase.
+
+	public static function ajax_manual_upload_to_gemini(): void {
+		@set_time_limit( 180 );
+		@ignore_user_abort( true );
+
+		check_ajax_referer( 'aiagent_manual_upload' );
+		self::require_cap();
+
+		if ( empty( $_FILES['file'] ) || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
+			$err_code = $_FILES['file']['error'] ?? -1;
+			wp_send_json_error( [ 'error' => 'Upload error (PHP code ' . $err_code . '). Check upload_max_filesize / post_max_size in php.ini.' ] );
+		}
+
+		$file      = $_FILES['file'];
+		$ext       = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+		$is_pdf    = ( $file['type'] === 'application/pdf' || $ext === 'pdf' );
+		$img_mimes = [ 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp' ];
+		$is_img    = in_array( $file['type'], $img_mimes, true );
+
+		if ( ! $is_pdf && ! $is_img ) {
+			wp_send_json_error( [ 'error' => 'Only PDF and image files are accepted.' ] );
+		}
+
+		// Save temporarily so we can pass to the File API.
+		$upload_dir = wp_upload_dir();
+		$dest       = trailingslashit( $upload_dir['basedir'] ) . 'aiagent-manuals/';
+		wp_mkdir_p( $dest );
+		$filename  = sanitize_file_name( $file['name'] );
+		$dest_file = $dest . wp_unique_filename( $dest, $filename );
+
+		if ( ! move_uploaded_file( $file['tmp_name'], $dest_file ) ) {
+			wp_send_json_error( [ 'error' => 'Failed to save uploaded file to disk.' ] );
+		}
+
+		$mime     = $is_pdf ? 'application/pdf' : $file['type'];
+		$uploaded = AIAgent_File_API::upload( $dest_file, $mime, $filename );
+		@unlink( $dest_file );
+
+		if ( $uploaded['error'] ) {
+			wp_send_json_error( [ 'error' => 'Gemini File API upload failed: ' . $uploaded['message'] ] );
+		}
+
+		wp_send_json_success( [
+			'file_uri'  => $uploaded['file_uri'],
+			'file_name' => $uploaded['file_name'],
+			'mime'      => $mime,
+			'is_pdf'    => $is_pdf,
+		] );
+	}
+
+	// ── AJAX: Step 2 — analyze uploaded file with Gemini, return extracted text ─
+
+	public static function ajax_manual_analyze_gemini(): void {
+		@set_time_limit( 600 );
+		@ignore_user_abort( true );
+
+		check_ajax_referer( 'aiagent_manual_upload' );
+		self::require_cap();
+
+		$file_uri  = sanitize_text_field( wp_unslash( $_POST['file_uri']  ?? '' ) );
+		$file_name = sanitize_text_field( wp_unslash( $_POST['file_name'] ?? '' ) );
+		$mime      = sanitize_text_field( wp_unslash( $_POST['mime']      ?? 'application/pdf' ) );
+		$is_pdf    = filter_var( $_POST['is_pdf'] ?? true, FILTER_VALIDATE_BOOLEAN );
+
+		if ( ! $file_uri ) {
+			wp_send_json_error( [ 'error' => 'Missing file_uri. Run the upload step first.' ] );
+		}
+
+		$prompt = $is_pdf
+			? "You are extracting a complete product support knowledge base from this document. "
+			  . "Your output will be used to train an AI assistant — every detail matters.\n\n"
+			  . "EXTRACT EVERYTHING — do not summarise, do not skip sections:\n"
+			  . "1. Product name, model number(s), SKU, variants\n"
+			  . "2. All technical specifications (dimensions, weight, power, capacity, materials, certifications)\n"
+			  . "3. Box contents / what's in the package\n"
+			  . "4. Installation & setup steps (numbered, verbatim)\n"
+			  . "5. All operating modes and features — exactly how they work\n"
+			  . "6. Complete error code table — every code with its exact meaning and fix\n"
+			  . "7. Full troubleshooting guide — every symptom with its cause and resolution\n"
+			  . "8. Maintenance schedule and cleaning instructions\n"
+			  . "9. Safety warnings and important notices (verbatim)\n"
+			  . "10. Warranty terms: duration, what's covered, what voids it\n"
+			  . "11. Any FAQ, tips, or Q&A sections — verbatim\n"
+			  . "12. Spare parts list and part numbers if present\n"
+			  . "13. Contact / support information\n\n"
+			  . "FORMAT RULES:\n"
+			  . "- Output plain text with clear section headings (e.g. ## Installation)\n"
+			  . "- Transcribe tables row by row (e.g. 'Error E01: Motor overload — turn off, wait 10 min, restart')\n"
+			  . "- Describe diagrams: what they show and any labelled parts\n"
+			  . "- Keep ALL numbers, codes, model numbers, measurements exactly as printed\n"
+			  . "- Do NOT add commentary, opinions, or any text not in the document"
+			: "Describe this product image in full detail for a support knowledge base:\n"
+			  . "- Product name and model number (read any labels/text)\n"
+			  . "- All visible components, ports, buttons, display\n"
+			  . "- Any error codes, status indicators, or warning labels\n"
+			  . "- Relevant specifications visible on labels";
+
+		$result = AIAgent_File_API::analyze( $file_uri, $mime, $prompt, [
+			'thinking'          => true,
+			'thinking_budget'   => 2048,
+			'max_output_tokens' => 65536,
+		] );
+
+		// Delete the remote file regardless of outcome.
+		if ( $file_name ) {
+			AIAgent_File_API::delete( $file_name );
+		}
+
+		if ( $result['error'] || $result['description'] === '' ) {
+			wp_send_json_error( [
+				'error' => 'Gemini could not extract text from the file. '
+				         . 'Ensure the Gemini API key is valid and the PDF has a text layer (not scanned-only).',
+			] );
+		}
+
+		wp_send_json_success( [ 'text' => $result['description'] ] );
+	}
+
+	// ── AJAX: PDF upload + text extraction (legacy single-step, kept for compat) ─
 
 	public static function ajax_upload_manual(): void {
+		@set_time_limit( 300 );
+		@ignore_user_abort( true );
 		check_ajax_referer( 'aiagent_manual_upload' );
 		self::require_cap();
 

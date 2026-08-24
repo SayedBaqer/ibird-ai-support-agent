@@ -7,6 +7,13 @@ defined( 'ABSPATH' ) || exit;
  */
 class AIAgent_RAG {
 
+	/**
+	 * Reserved "model" value for manual content that applies across every product
+	 * (battery care, resets, connectivity, packaging, etc.) — ingested and searched
+	 * through the exact same manual_chunks pipeline as a specific model.
+	 */
+	const COMMON_MODEL = '__common__';
+
 	// ── Similarity ────────────────────────────────────────────────────────────
 
 	public static function cosine_similarity( array $a, array $b ): float {
@@ -66,10 +73,11 @@ class AIAgent_RAG {
 
 	/**
 	 * Find the closest taught examples to a question.
-	 * Returns array of ['question'=>, 'solution'=>, 'score'=>] sorted desc.
+	 * Uses hybrid retrieval: MySQL FULLTEXT/LIKE pre-filter → cosine re-rank.
+	 * Scores are boosted by confidence (admin can demote noisy examples).
+	 * Returns array of ['id', 'question', 'solution', 'score'] sorted desc.
 	 *
 	 * @param string $lang  Optional — filters to rows tagged 'en', 'ar', or 'both'.
-	 *                      Pass '' to search all languages (less precise for Arabic).
 	 */
 	public static function search_taught_examples( string $question, int $limit = 3, string $lang = '' ): array {
 		global $wpdb;
@@ -79,32 +87,75 @@ class AIAgent_RAG {
 			return [];
 		}
 
-		// Coarse SQL filter by language before running cosine — reduces the candidate
-		// set by ~50% when the customer language is known, which improves relevance.
-		if ( $lang !== '' && in_array( $lang, [ 'en', 'ar' ], true ) ) {
-			$rows = $wpdb->get_results( $wpdb->prepare(
-				"SELECT question, solution, embedding FROM {$wpdb->prefix}aiagent_taught_examples
-				WHERE embedding IS NOT NULL AND (language = %s OR language = 'both')",
-				$lang
-			) );
-		} else {
+		$lang_sql = ( $lang !== '' && in_array( $lang, [ 'en', 'ar' ], true ) )
+			? $wpdb->prepare( "AND (language = %s OR language = 'both')", $lang )
+			: '';
+
+		// ── Step 1: keyword pre-filter (fast, indexed) ────────────────────────
+		// Extracts meaningful words from the question for a FULLTEXT or LIKE filter.
+		// This reduces the cosine comparison set from potentially thousands to ~50.
+		$words = array_filter(
+			preg_split( '/\s+/', preg_replace( '/[^\p{L}\p{N}\s]/u', ' ', $question ) ),
+			fn( $w ) => mb_strlen( $w ) > 2
+		);
+
+		$rows = [];
+
+		// Try FULLTEXT (requires ft_qa index — added in DB install).
+		if ( ! empty( $words ) ) {
+			$has_ft = $wpdb->get_var( "SHOW INDEX FROM {$wpdb->prefix}aiagent_taught_examples WHERE Key_name = 'ft_qa'" );
+			if ( $has_ft ) {
+				$ft_str = implode( ' ', array_map( fn( $w ) => '+' . $wpdb->esc_like( $w ), array_slice( $words, 0, 6 ) ) );
+				$rows   = $wpdb->get_results( $wpdb->prepare(
+					"SELECT id, question, solution, embedding, confidence, usage_count
+					FROM {$wpdb->prefix}aiagent_taught_examples
+					WHERE MATCH(question, solution) AGAINST(%s IN BOOLEAN MODE)
+					AND embedding IS NOT NULL {$lang_sql}
+					LIMIT 60",
+					$ft_str
+				) );
+			}
+
+			// Fallback: LIKE on first keyword (still cheaper than full-table cosine).
+			if ( empty( $rows ) ) {
+				$like = '%' . $wpdb->esc_like( $words[0] ) . '%';
+				$rows = $wpdb->get_results( $wpdb->prepare(
+					"SELECT id, question, solution, embedding, confidence, usage_count
+					FROM {$wpdb->prefix}aiagent_taught_examples
+					WHERE (question LIKE %s OR solution LIKE %s)
+					AND embedding IS NOT NULL {$lang_sql}
+					LIMIT 60",
+					$like, $like
+				) );
+			}
+		}
+
+		// Final fallback: full scan (small KBs only — fine for < 500 examples).
+		if ( empty( $rows ) ) {
 			$rows = $wpdb->get_results(
-				"SELECT question, solution, embedding FROM {$wpdb->prefix}aiagent_taught_examples WHERE embedding IS NOT NULL"
+				"SELECT id, question, solution, embedding, confidence, usage_count
+				FROM {$wpdb->prefix}aiagent_taught_examples
+				WHERE embedding IS NOT NULL {$lang_sql}"
 			);
 		}
 
+		// ── Step 2: cosine re-rank ────────────────────────────────────────────
 		$scored = [];
 		foreach ( $rows as $row ) {
 			$emb = json_decode( $row->embedding, true );
 			if ( ! is_array( $emb ) ) {
 				continue;
 			}
-			$score = self::cosine_similarity( $q_embedding, $emb );
-			if ( $score > 0.65 ) {
-				$scored[] = [
-					'question' => $row->question,
-					'solution' => $row->solution,
-					'score'    => $score,
+			$sim = self::cosine_similarity( $q_embedding, $emb );
+			if ( $sim >= 0.60 ) {
+				// Boost score by confidence so higher-quality examples rank above noisy ones.
+				$confidence = (float) ( $row->confidence ?? 1.0 );
+				$scored[]   = [
+					'id'         => (int) $row->id,
+					'question'   => $row->question,
+					'solution'   => $row->solution,
+					'score'      => $sim * ( 0.80 + 0.20 * min( 1.0, $confidence ) ),
+					'usage_count' => (int) $row->usage_count,
 				];
 			}
 		}
@@ -113,10 +164,158 @@ class AIAgent_RAG {
 		return array_slice( $scored, 0, $limit );
 	}
 
+	/**
+	 * Check whether a near-duplicate question already exists in the knowledge base.
+	 * Returns the existing row (id, question, solution) or null if no near-duplicate.
+	 * Used to prevent knowledge base noise when auto-promoting or bulk-importing.
+	 */
+	public static function find_duplicate( string $question, float $threshold = 0.93 ): ?array {
+		global $wpdb;
+
+		$emb = AIAgent_LLM::embed( $question );
+		if ( empty( $emb ) ) {
+			return null;
+		}
+
+		$rows = $wpdb->get_results(
+			"SELECT id, question, solution, embedding FROM {$wpdb->prefix}aiagent_taught_examples
+			WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT 300"
+		);
+
+		foreach ( $rows as $row ) {
+			$stored = json_decode( $row->embedding, true );
+			if ( ! is_array( $stored ) ) {
+				continue;
+			}
+			if ( self::cosine_similarity( $emb, $stored ) >= $threshold ) {
+				return [
+					'id'       => (int) $row->id,
+					'question' => $row->question,
+					'solution' => $row->solution,
+				];
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Increment usage_count and update last_used for a list of example IDs.
+	 * Called every time the tools layer retrieves and uses examples in a reply.
+	 */
+	public static function increment_usage( array $ids ): void {
+		if ( empty( $ids ) ) {
+			return;
+		}
+		global $wpdb;
+		$ids_in = implode( ',', array_map( 'absint', $ids ) );
+		$wpdb->query(
+			"UPDATE {$wpdb->prefix}aiagent_taught_examples
+			SET usage_count = usage_count + 1, last_used = NOW()
+			WHERE id IN ({$ids_in})"
+		);
+	}
+
+	/**
+	 * Lower the confidence of examples that were retrieved but led to escalation.
+	 * Called by the escalate_to_human tool to decay quality of unhelpful examples.
+	 */
+	public static function decay_confidence( array $ids, float $factor = 0.85 ): void {
+		if ( empty( $ids ) ) {
+			return;
+		}
+		global $wpdb;
+		$ids_in = implode( ',', array_map( 'absint', $ids ) );
+		$wpdb->query(
+			"UPDATE {$wpdb->prefix}aiagent_taught_examples
+			SET confidence = GREATEST(0.1, confidence * {$factor})
+			WHERE id IN ({$ids_in})"
+		);
+	}
+
 	// ── Manual chunks ─────────────────────────────────────────────────────────
 
 	/**
-	 * Embed and store a single manual chunk.
+	 * Store a manual chunk immediately WITHOUT embedding (fast, no API call).
+	 * Embeddings are filled in later by embed_pending_chunks().
+	 * Returns the inserted row id or 0 on failure.
+	 */
+	public static function store_manual_chunk_bare(
+		string $model,
+		string $section_title,
+		string $chunk,
+		string $source_file
+	): int {
+		global $wpdb;
+		$wpdb->insert(
+			"{$wpdb->prefix}aiagent_manual_chunks",
+			[
+				'model'         => $model,
+				'section_title' => $section_title,
+				'chunk'         => $chunk,
+				'embedding'     => null,
+				'source_file'   => $source_file,
+			],
+			[ '%s', '%s', '%s', '%s', '%s' ]
+		);
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Background job: embed all manual chunks that have no embedding yet.
+	 * Processes up to $batch at a time to stay within PHP limits.
+	 */
+	public static function embed_pending_chunks( int $batch = 40 ): int {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, section_title, chunk FROM {$wpdb->prefix}aiagent_manual_chunks WHERE embedding IS NULL LIMIT %d",
+			$batch
+		) );
+		$done = 0;
+		foreach ( $rows as $row ) {
+			$emb = AIAgent_LLM::embed( $row->section_title . "\n" . $row->chunk );
+			if ( ! empty( $emb ) ) {
+				$wpdb->update(
+					"{$wpdb->prefix}aiagent_manual_chunks",
+					[ 'embedding' => wp_json_encode( $emb ) ],
+					[ 'id' => $row->id ],
+					[ '%s' ], [ '%d' ]
+				);
+				$done++;
+			}
+		}
+		// If there are more pending, reschedule.
+		$remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}aiagent_manual_chunks WHERE embedding IS NULL" );
+		if ( $remaining > 0 ) {
+			wp_schedule_single_event( time() + 5, 'aiagent_embed_chunks_cron' );
+		}
+		return $done;
+	}
+
+	/**
+	 * Background job: embed all taught examples that have no embedding yet.
+	 */
+	public static function embed_pending_examples( int $batch = 30 ): int {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}aiagent_taught_examples WHERE embedding IS NULL LIMIT %d",
+			$batch
+		) );
+		$done = 0;
+		foreach ( $rows as $row ) {
+			if ( self::embed_taught_example( (int) $row->id ) ) {
+				$done++;
+			}
+		}
+		$remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}aiagent_taught_examples WHERE embedding IS NULL" );
+		if ( $remaining > 0 ) {
+			wp_schedule_single_event( time() + 5, 'aiagent_embed_examples_cron' );
+		}
+		return $done;
+	}
+
+	/**
+	 * Embed and store a single manual chunk (original method — kept for compatibility).
 	 */
 	public static function store_manual_chunk(
 		string $model,
@@ -289,9 +488,12 @@ class AIAgent_RAG {
 
 	/**
 	 * Check whether a near-identical question was answered recently.
+	 * Scoped by $model — Mode A can now give model-specific manual-grounded
+	 * answers, so a cache hit for one product must never be served for another.
+	 * Pass '' for the general (no product selected) bucket.
 	 * Returns ['answer'=>string, 'score'=>float, 'id'=>int] or null on miss.
 	 */
-	public static function semantic_cache_get( string $question, float $threshold = 0.92 ): ?array {
+	public static function semantic_cache_get( string $question, string $model = '', float $threshold = 0.92 ): ?array {
 		global $wpdb;
 
 		$q_emb = AIAgent_LLM::embed( $question );
@@ -299,10 +501,11 @@ class AIAgent_RAG {
 			return null;
 		}
 
-		$recent = $wpdb->get_results(
+		$recent = $wpdb->get_results( $wpdb->prepare(
 			"SELECT id, question, answer, embedding FROM {$wpdb->prefix}aiagent_semantic_cache
-			WHERE expires_at > NOW() ORDER BY created_at DESC LIMIT 200"
-		);
+			WHERE expires_at > NOW() AND model = %s ORDER BY created_at DESC LIMIT 200",
+			$model
+		) );
 
 		$best       = null;
 		$best_score = 0.0;
@@ -331,10 +534,10 @@ class AIAgent_RAG {
 	}
 
 	/**
-	 * Store a new Q→A pair in the semantic cache.
-	 * Expires according to the data_retention_days setting.
+	 * Store a new Q→A pair in the semantic cache, scoped to $model (see
+	 * semantic_cache_get). Expires according to the data_retention_days setting.
 	 */
-	public static function semantic_cache_set( string $question, string $answer ): void {
+	public static function semantic_cache_set( string $question, string $answer, string $model = '' ): void {
 		global $wpdb;
 
 		$emb = AIAgent_LLM::embed( $question );
@@ -351,9 +554,10 @@ class AIAgent_RAG {
 				'question'   => $question,
 				'answer'     => $answer,
 				'embedding'  => wp_json_encode( $emb ),
+				'model'      => $model,
 				'expires_at' => $expires,
 			],
-			[ '%s', '%s', '%s', '%s' ]
+			[ '%s', '%s', '%s', '%s', '%s' ]
 		);
 	}
 
